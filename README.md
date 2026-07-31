@@ -1,4 +1,14 @@
-# kute
+## -- Installation
+
+```bash
+git clone https://github.com/jaso-gentoo/kute
+cd kute
+npm install
+npm run build-linux
+```
+your AppImage will be in /kute-releases
+
+## -- Matugen
 
 ### matugen template (*~/.config/matugen/template/kute.json*)
 ```jsom
