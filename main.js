@@ -136,7 +136,6 @@ app.whenReady().then(() => {
     if (!fs.existsSync(electronDataDir)) {
         fs.mkdirSync(electronDataDir, { recursive: true });
     }
-    // Убедимся, что пути установлены (повторно, на всякий случай)
     app.setPath('userData', electronDataDir);
     app.setPath('cache', electronDataDir);
     app.setPath('crashDumps', path.join(electronDataDir, 'Crashpad'));
