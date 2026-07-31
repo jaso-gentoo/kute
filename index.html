@@ -138,7 +138,7 @@
                                     <li><kbd>Ctrl+/</kbd> - Open shortcuts</li>
                                     <li><kbd>Ctrl+E</kbd> - Open settings</li>
                                     <li><kbd>Ctrl+O</kbd> - Select directory</li>
-                                    <li><kbd>Ctrl+Z</kbd> - Hide/show library panel</li>
+                                    <li><kbd>Ctrl+T</kbd> - Hide/show library panel</li>
                                     <li><kbd>Ctrl+Shift+E</kbd> - Edit playlist order</li>
                                     <li><kbd>Esc</kbd> - Close menu</li>
                                 </ul>
@@ -170,6 +170,11 @@
                                             </div>
                                         </label>
                                     </div>
+                                    <div class="settings-option">
+                                        <button id="rpc-restart-btn" class="lib-btn" style="width:100%; justify-content:center; margin-top:4px;">
+                                            <i class="fas fa-sync"></i> Restart RPC
+                                        </button>
+                                    </div>
                                 </div>
                                 <div class="settings-section">
                                     <div class="settings-section-title">Appearance</div>
@@ -182,6 +187,23 @@
                                             </div>
                                         </label>
                                         <div class="settings-note">Switch between light and dark mode</div>
+                                    </div>
+                                    <div class="settings-option">
+                                        <label class="switch-label">
+                                            <span class="switch-text">Matugen</span>
+                                            <div class="switch">
+                                                <input type="checkbox" id="matugen-toggle">
+                                                <span class="slider"></span>
+                                            </div>
+                                        </label>
+                                        <div class="settings-note">Theme colors from wallpaper</div>
+                                    </div>
+                                </div>
+                                <div class="settings-section">
+                                    <div class="settings-section-title">System</div>
+                                    <div class="settings-option" style="display:flex; justify-content:space-between; align-items:center;">
+                                        <span class="switch-text" style="font-weight:normal;">Operating System</span>
+                                        <span id="system-info" style="color: var(--text-secondary); font-size:0.9rem;">Unknown</span>
                                     </div>
                                 </div>
                             </div>

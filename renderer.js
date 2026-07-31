@@ -1,6 +1,7 @@
 const { ipcRenderer } = require('electron');
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 const mm = require('music-metadata');
 const packageJson = require('./package.json');
 
@@ -49,9 +50,10 @@ let dropIndicator = null;
 let scrollPosition = 0;
 let insertAfterIndex = -1;
 
-const CONFIG_DIR = path.join(require('os').homedir(), '.config', 'kute-player');
+const CONFIG_DIR = path.join(os.homedir(), '.config', 'kute-player');
 const LYRICS_DIR = path.join(CONFIG_DIR, 'txts');
 const PLAYLIST_ORDER_FILE = path.join(CONFIG_DIR, 'playlist_order.json');
+const MATUGEN_FILE = path.join(CONFIG_DIR, 'matugen', 'kute.json');
 
 const editMetadataBtn = document.getElementById('edit-metadata-btn');
 const metadataModal = document.getElementById('metadata-modal');
@@ -74,49 +76,286 @@ const settingsModal = document.getElementById('settings-modal');
 const settingsCloseBtn = document.getElementById('settings-close-btn');
 const discordRpcToggle = document.getElementById('discord-rpc-toggle');
 const themeToggle = document.getElementById('theme-toggle');
+const matugenToggle = document.getElementById('matugen-toggle');
+const rpcRestartBtn = document.getElementById('rpc-restart-btn');
+const systemInfoEl = document.getElementById('system-info');
+
 let discordRpcEnabled = true;
 let currentTheme = 'dark';
+let matugenEnabled = false;
+let matugenColors = null;
+let matugenWatcher = null;
 
 let currentCoverFile = null;
+let systemName = 'Unknown System';
+
+// --- AudioContext для визуализатора ---
+let audioCtx = null;
+let analyser = null;
+let dataArray = null;
+let isVisualizerRunning = false;
 
 if (!fs.existsSync(LYRICS_DIR)) fs.mkdirSync(LYRICS_DIR, { recursive: true });
 
 let presenceStartTimestamp = null;
 
+// ========== ОПРЕДЕЛЕНИЕ СИСТЕМЫ ==========
+function getSystemInfo() {
+    const platform = os.platform();
+    if (platform === 'win32') return 'Windows ' + (os.release() || '');
+    if (platform === 'darwin') return 'macOS ' + (os.release() || '');
+    if (platform === 'linux') {
+        try {
+            const content = fs.readFileSync('/etc/os-release', 'utf8');
+            const match = content.match(/^PRETTY_NAME=(.+)$/m);
+            if (match) {
+                let name = match[1].trim();
+                if ((name.startsWith('"') && name.endsWith('"')) || (name.startsWith("'") && name.endsWith("'"))) {
+                    name = name.slice(1, -1);
+                }
+                return name;
+            }
+        } catch (e) {}
+        return 'Linux';
+    }
+    return platform;
+}
+
+systemName = getSystemInfo();
+
+// Обновляем системную информацию в настройках (если элемент уже загружен)
+const sysInfoEl = document.getElementById('system-info');
+if (sysInfoEl) {
+    sysInfoEl.textContent = systemName;
+}
+
 function updateDiscordPresence() {
-    console.log('[Renderer] updateDiscordPresence called, discordRpcEnabled =', discordRpcEnabled, 'isPlaying =', isPlaying);
     if (!discordRpcEnabled) {
-        console.log('[Renderer] Discord RPC disabled by user');
+        ipcRenderer.send('update-presence', null);
         return;
     }
     if (!isPlaying) {
-        console.log('[Renderer] Sending null presence (paused)');
         ipcRenderer.send('update-presence', null);
         return;
     }
     const track = tracks[currentTrackIndex];
-    if (!track) {
-        console.log('[Renderer] No track, skipping presence');
-        return;
-    }
+    if (!track) return;
     const activity = {
         details: track.name,
         state: track.artist,
         type: 2,
-        largeImageText: 'Kute Player',
+        largeImageText: 'Kute Player on ' + systemName,
         startTimestamp: Math.floor(Date.now() / 1000 - audio.currentTime)
     };
-    console.log('[Renderer] Sending activity:', activity);
     ipcRenderer.send('update-presence', activity);
 }
 
 function applyTheme(theme) {
+    currentTheme = theme;
+    const root = document.documentElement;
     if (theme === 'light') {
         document.body.classList.add('light-theme');
+        document.body.classList.remove('dark-theme');
+        root.style.setProperty('--bg-primary', '#f0f0f0');
+        root.style.setProperty('--bg-secondary', '#ffffff');
+        root.style.setProperty('--bg-header', '#e8e8e8');
+        root.style.setProperty('--bg-player', 'rgba(245,245,245,0.95)');
+        root.style.setProperty('--bg-library', 'rgba(240,240,240,0.95)');
+        root.style.setProperty('--bg-status', '#e8e8e8');
+        root.style.setProperty('--bg-track', 'rgba(0,0,0,0.02)');
+        root.style.setProperty('--bg-track-hover', 'rgba(0,0,0,0.04)');
+        root.style.setProperty('--bg-track-active', 'rgba(0,0,0,0.06)');
+        root.style.setProperty('--bg-input', 'rgba(0,0,0,0.03)');
+        root.style.setProperty('--bg-input-focus', 'rgba(0,0,0,0.05)');
+        root.style.setProperty('--bg-slider', 'rgba(0,0,0,0.1)');
+        root.style.setProperty('--bg-slider-thumb', '#222');
+        root.style.setProperty('--bg-scrollbar', '#ccc');
+        root.style.setProperty('--bg-scrollbar-hover', '#aaa');
+        root.style.setProperty('--bg-modal', 'rgba(245,245,245,0.95)');
+        root.style.setProperty('--bg-modal-overlay', 'rgba(0,0,0,0.2)');
+        root.style.setProperty('--bg-switch-off', '#ccc');
+        root.style.setProperty('--bg-switch-on', '#444');
+        root.style.setProperty('--bg-btn', 'rgba(0,0,0,0.05)');
+        root.style.setProperty('--bg-btn-hover', 'rgba(0,0,0,0.08)');
+        root.style.setProperty('--border-color', 'rgba(0,0,0,0.08)');
+        root.style.setProperty('--text-primary', '#222');
+        root.style.setProperty('--text-secondary', '#555');
+        root.style.setProperty('--text-muted', '#666');
+        root.style.setProperty('--text-dim', '#999');
+        root.style.setProperty('--text-light', '#444');
+        root.style.setProperty('--text-on-switch', 'white');
+        root.style.setProperty('--shadow', '0 6px 12px rgba(0,0,0,0.15)');
+        root.style.setProperty('--notification-bg', '#e0e0e0');
+        root.style.setProperty('--notification-text', '#222');
+        root.style.setProperty('--notification-border', 'rgba(0,0,0,0.1)');
     } else {
+        document.body.classList.add('dark-theme');
+        document.body.classList.remove('light-theme');
+        root.style.setProperty('--bg-primary', '#0a0a0a');
+        root.style.setProperty('--bg-secondary', '#0f0f0f');
+        root.style.setProperty('--bg-header', '#0c0c0c');
+        root.style.setProperty('--bg-player', 'rgba(15,15,15,0.9)');
+        root.style.setProperty('--bg-library', 'rgba(10,10,10,0.9)');
+        root.style.setProperty('--bg-status', '#0c0c0c');
+        root.style.setProperty('--bg-track', 'rgba(255,255,255,0.02)');
+        root.style.setProperty('--bg-track-hover', 'rgba(255,255,255,0.04)');
+        root.style.setProperty('--bg-track-active', 'rgba(255,255,255,0.06)');
+        root.style.setProperty('--bg-input', 'rgba(255,255,255,0.03)');
+        root.style.setProperty('--bg-input-focus', 'rgba(255,255,255,0.05)');
+        root.style.setProperty('--bg-slider', 'rgba(255,255,255,0.1)');
+        root.style.setProperty('--bg-slider-thumb', '#c0c0c0');
+        root.style.setProperty('--bg-scrollbar', '#5a5a5a');
+        root.style.setProperty('--bg-scrollbar-hover', '#7a7a7a');
+        root.style.setProperty('--bg-modal', 'rgba(20,20,20,0.95)');
+        root.style.setProperty('--bg-modal-overlay', 'rgba(0,0,0,0.2)');
+        root.style.setProperty('--bg-switch-off', '#555');
+        root.style.setProperty('--bg-switch-on', 'white');
+        root.style.setProperty('--bg-btn', 'rgba(255,255,255,0.03)');
+        root.style.setProperty('--bg-btn-hover', 'rgba(255,255,255,0.06)');
+        root.style.setProperty('--border-color', 'rgba(255,255,255,0.05)');
+        root.style.setProperty('--text-primary', '#e0e0e0');
+        root.style.setProperty('--text-secondary', '#b0b0b0');
+        root.style.setProperty('--text-muted', '#8a8a8a');
+        root.style.setProperty('--text-dim', '#777');
+        root.style.setProperty('--text-light', '#ccc');
+        root.style.setProperty('--text-on-switch', '#555');
+        root.style.setProperty('--shadow', '0 6px 12px rgba(0,0,0,0.3)');
+        root.style.setProperty('--notification-bg', '#2a2a2a');
+        root.style.setProperty('--notification-text', '#e0e0e0');
+        root.style.setProperty('--notification-border', 'rgba(255,255,255,0.1)');
+    }
+}
+
+function loadMatugenColors() {
+    try {
+        if (fs.existsSync(MATUGEN_FILE)) {
+            const data = JSON.parse(fs.readFileSync(MATUGEN_FILE, 'utf8'));
+            matugenColors = data;
+            return true;
+        }
+    } catch (e) {}
+    return false;
+}
+
+function isLightColor(hex) {
+    const r = parseInt(hex.slice(1,3), 16);
+    const g = parseInt(hex.slice(3,5), 16);
+    const b = parseInt(hex.slice(5,7), 16);
+    const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+    return brightness > 128;
+}
+
+function applyMatugenTheme() {
+    if (!matugenEnabled || !matugenColors) return;
+    const root = document.documentElement;
+    const c = matugenColors;
+    const isLight = isLightColor(c.background || '#121212');
+    if (isLight) {
+        document.body.classList.add('light-theme');
+        document.body.classList.remove('dark-theme');
+    } else {
+        document.body.classList.add('dark-theme');
         document.body.classList.remove('light-theme');
     }
-    currentTheme = theme;
+    const primary = c.primary || (isLight ? '#6200ee' : '#bb86fc');
+    const background = c.background || (isLight ? '#f5f5f5' : '#121212');
+    const surface = c.surface || (isLight ? '#ffffff' : '#1e1e1e');
+    const onBackground = c.onBackground || (isLight ? '#222' : '#e0e0e0');
+    const onSurface = c.onSurface || (isLight ? '#222' : '#e0e0e0');
+    const primaryContainer = c.primaryContainer || (isLight ? '#e0d0ff' : '#4a2a7a');
+    const onPrimaryContainer = c.onPrimaryContainer || (isLight ? '#220055' : '#d0b0ff');
+    const secondary = c.secondary || '#03dac6';
+    root.style.setProperty('--bg-primary', background);
+    root.style.setProperty('--bg-secondary', surface);
+    root.style.setProperty('--bg-header', surface);
+    root.style.setProperty('--bg-player', surface);
+    root.style.setProperty('--bg-library', surface);
+    root.style.setProperty('--bg-status', surface);
+    root.style.setProperty('--bg-track', isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)');
+    root.style.setProperty('--bg-track-hover', isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.04)');
+    root.style.setProperty('--bg-track-active', isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)');
+    root.style.setProperty('--bg-input', isLight ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.03)');
+    root.style.setProperty('--bg-input-focus', isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.05)');
+    root.style.setProperty('--bg-slider', isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)');
+    root.style.setProperty('--bg-slider-thumb', isLight ? '#222' : '#c0c0c0');
+    root.style.setProperty('--bg-scrollbar', isLight ? '#ccc' : '#5a5a5a');
+    root.style.setProperty('--bg-scrollbar-hover', isLight ? '#aaa' : '#7a7a7a');
+    root.style.setProperty('--bg-modal', isLight ? 'rgba(245,245,245,0.95)' : 'rgba(20,20,20,0.95)');
+    root.style.setProperty('--bg-modal-overlay', 'rgba(0,0,0,0.2)');
+    root.style.setProperty('--bg-switch-off', isLight ? '#ccc' : '#555');
+    root.style.setProperty('--bg-switch-on', isLight ? '#444' : 'white');
+    root.style.setProperty('--bg-btn', isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.03)');
+    root.style.setProperty('--bg-btn-hover', isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.06)');
+    root.style.setProperty('--border-color', isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.05)');
+    root.style.setProperty('--text-primary', onBackground);
+    root.style.setProperty('--text-secondary', isLight ? '#555' : '#b0b0b0');
+    root.style.setProperty('--text-muted', isLight ? '#666' : '#8a8a8a');
+    root.style.setProperty('--text-dim', isLight ? '#999' : '#777');
+    root.style.setProperty('--text-light', isLight ? '#444' : '#ccc');
+    root.style.setProperty('--text-on-switch', isLight ? 'white' : '#555');
+    root.style.setProperty('--shadow', isLight ? '0 6px 12px rgba(0,0,0,0.15)' : '0 6px 12px rgba(0,0,0,0.3)');
+    root.style.setProperty('--notification-bg', isLight ? '#e0e0e0' : '#2a2a2a');
+    root.style.setProperty('--notification-text', isLight ? '#222' : '#e0e0e0');
+    root.style.setProperty('--notification-border', isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)');
+}
+
+function watchMatugenFile() {
+    if (matugenWatcher) {
+        matugenWatcher.close();
+        matugenWatcher = null;
+    }
+    const dir = path.dirname(MATUGEN_FILE);
+    if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+    }
+    matugenWatcher = fs.watch(MATUGEN_FILE, (eventType) => {
+        if (eventType === 'change' && matugenEnabled) {
+            const hasColors = loadMatugenColors();
+            if (hasColors) {
+                applyMatugenTheme();
+            } else {
+                matugenEnabled = false;
+                matugenToggle.checked = false;
+                themeToggle.disabled = false;
+                themeToggle.parentElement.parentElement.style.opacity = '1';
+                themeToggle.parentElement.parentElement.style.pointerEvents = 'auto';
+                applyTheme(currentTheme);
+                showNotification('Matugen config invalid, disabling');
+                const settings = config.loadSettings();
+                settings.matugenEnabled = false;
+                config.saveSettings(settings.volume, settings.libraryPath, settings.repeatMode, settings.discordRpcEnabled, settings.theme, false);
+            }
+        }
+    });
+    matugenWatcher.on('error', () => {});
+}
+
+function updateMatugenState() {
+    if (matugenEnabled) {
+        const hasColors = loadMatugenColors();
+        if (hasColors) {
+            applyMatugenTheme();
+            themeToggle.disabled = true;
+            themeToggle.parentElement.parentElement.style.opacity = '0.5';
+            themeToggle.parentElement.parentElement.style.pointerEvents = 'none';
+        } else {
+            matugenEnabled = false;
+            matugenToggle.checked = false;
+            themeToggle.disabled = false;
+            themeToggle.parentElement.parentElement.style.opacity = '1';
+            themeToggle.parentElement.parentElement.style.pointerEvents = 'auto';
+            applyTheme(currentTheme);
+            showNotification('Matugen config not found, disabling');
+            const settings = config.loadSettings();
+            settings.matugenEnabled = false;
+            config.saveSettings(settings.volume, settings.libraryPath, settings.repeatMode, settings.discordRpcEnabled, settings.theme, false);
+        }
+    } else {
+        themeToggle.disabled = false;
+        themeToggle.parentElement.parentElement.style.opacity = '1';
+        themeToggle.parentElement.parentElement.style.pointerEvents = 'auto';
+        applyTheme(currentTheme);
+    }
 }
 
 document.getElementById('maximize-btn').addEventListener('click', () => ipcRenderer.send('maximize-window'));
@@ -126,10 +365,10 @@ selectLibraryBtn.addEventListener('click', async () => {
     try {
         const folderPath = await ipcRenderer.invoke('select-folder');
         if (folderPath) {
-            libraryFolder = folderPath;
-            libraryPath.textContent = folderPath.split('/').pop() || folderPath;
-            loadTracksFromFolder(folderPath);
-            config.saveSettings(volumeSlider.value, libraryFolder, repeatMode, discordRpcEnabled, currentTheme);
+            libraryFolder = path.resolve(folderPath);
+            libraryPath.textContent = path.basename(libraryFolder);
+            loadTracksFromFolder(libraryFolder);
+            config.saveSettings(volumeSlider.value, libraryFolder, repeatMode, discordRpcEnabled, currentTheme, matugenEnabled);
         }
     } catch (error) {
         showNotification('Error loading library');
@@ -137,6 +376,7 @@ selectLibraryBtn.addEventListener('click', async () => {
 });
 
 async function loadTracksFromFolder(folderPath) {
+    console.log('[DEBUG] loadTracksFromFolder:', folderPath);
     try {
         const files = fs.readdirSync(folderPath);
         const trackPromises = [];
@@ -160,6 +400,7 @@ async function loadTracksFromFolder(folderPath) {
         saveOriginalTracks();
         if (tracks.length > 0) loadTrack(0, false);
     } catch (error) {
+        console.error('[DEBUG] loadTracksFromFolder error:', error);
         showNotification('Failed to load tracks');
     }
 }
@@ -245,8 +486,21 @@ function refreshTrackList() {
         infoDiv.textContent = `${track.artist} • ${track.album || 'No Album'}`;
         detailsDiv.appendChild(nameDiv);
         detailsDiv.appendChild(infoDiv);
+
+        // --- Визуализатор (cava-style) ---
+        const vizCanvas = document.createElement('canvas');
+        vizCanvas.className = 'visualizer-canvas';
+        vizCanvas.width = 40;
+        vizCanvas.height = 24;
+        vizCanvas.style.width = '40px';
+        vizCanvas.style.height = '24px';
+        vizCanvas.style.marginLeft = 'auto';
+        vizCanvas.style.display = 'none';
+        vizCanvas.dataset.trackIndex = index;
+
         trackItem.appendChild(coverDiv);
         trackItem.appendChild(detailsDiv);
+        trackItem.appendChild(vizCanvas);
         trackItem.addEventListener('click', (e) => {
             if (isPlaylistEditing) return;
             loadTrack(index, true);
@@ -263,6 +517,119 @@ function refreshTrackList() {
     if (isPlaylistEditing) {
         setTimeout(() => setupDragAndDrop(), 20);
     }
+    showVisualizerForCurrentTrack();
+}
+
+function showVisualizerForCurrentTrack() {
+    const canvases = document.querySelectorAll('.visualizer-canvas');
+    canvases.forEach((canvas) => {
+        const idx = parseInt(canvas.dataset.trackIndex);
+        if (idx === currentTrackIndex && isPlaying) {
+            canvas.style.display = 'block';
+        } else {
+            canvas.style.display = 'none';
+        }
+    });
+}
+
+// --- Функции визуализатора (cava-стиль + зеркальное отражение) ---
+function initAudioContext() {
+    if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 64;
+        dataArray = new Uint8Array(analyser.frequencyBinCount);
+        const source = audioCtx.createMediaElementSource(audio);
+        source.connect(analyser);
+        analyser.connect(audioCtx.destination);
+    }
+}
+
+function startVisualizer() {
+    if (isVisualizerRunning) return;
+    if (!audioCtx) initAudioContext();
+    isVisualizerRunning = true;
+
+    const canvas = document.querySelector(`.visualizer-canvas[data-track-index="${currentTrackIndex}"]`);
+    if (!canvas) {
+        isVisualizerRunning = false;
+        return;
+    }
+    const ctx = canvas.getContext('2d');
+    const width = canvas.width;
+    const height = canvas.height;
+    const centerY = height / 2;
+    const barWidth = 3;
+    const gap = 1;
+    const numBars = Math.floor(width / (barWidth + gap));
+    const halfBars = Math.floor(numBars / 2);
+
+    function draw() {
+        if (!isVisualizerRunning || !isPlaying) {
+            isVisualizerRunning = false;
+            return;
+        }
+        analyser.getByteFrequencyData(dataArray);
+        ctx.clearRect(0, 0, width, height);
+        const step = Math.floor(dataArray.length / halfBars);
+        const color = getComputedStyle(document.documentElement).getPropertyValue('--text-primary').trim() || '#e0e0e0';
+        for (let i = 0; i < halfBars; i++) {
+            const value = dataArray[i * step] || 0;
+            const percent = value / 255;
+            const barHeight = Math.max(1, percent * centerY);
+            const xLeft = (halfBars - 1 - i) * (barWidth + gap) + gap/2;
+            const xRight = (halfBars + i) * (barWidth + gap) + gap/2;
+            // Левая сторона
+            ctx.fillStyle = color;
+            ctx.fillRect(xLeft, centerY - barHeight, barWidth, barHeight);
+            ctx.fillRect(xLeft, centerY, barWidth, barHeight);
+            // Правая сторона (зеркально)
+            ctx.fillRect(xRight, centerY - barHeight, barWidth, barHeight);
+            ctx.fillRect(xRight, centerY, barWidth, barHeight);
+        }
+        requestAnimationFrame(draw);
+    }
+    draw();
+}
+
+function stopVisualizer() {
+    isVisualizerRunning = false;
+    const canvases = document.querySelectorAll('.visualizer-canvas');
+    canvases.forEach(c => {
+        const ctx = c.getContext('2d');
+        ctx.clearRect(0, 0, c.width, c.height);
+    });
+}
+
+// --- Переопределение функций воспроизведения (с остановкой старого визуализатора) ---
+function playTrack() {
+    if (isVisualizerRunning) {
+        stopVisualizer();
+    }
+    audio.play().then(() => {
+        isPlaying = true;
+        updateDiscordPresence();
+        playBtn.style.display = 'none';
+        pauseBtn.style.display = 'flex';
+        isExternalControl = false;
+        updatePlaybackState('playing');
+        showVisualizerForCurrentTrack();
+        if (!isVisualizerRunning) {
+            initAudioContext();
+            startVisualizer();
+        }
+    }).catch(() => { showNotification('Playback failed'); });
+}
+
+function pauseTrack() {
+    audio.pause();
+    isPlaying = false;
+    updateDiscordPresence();
+    playBtn.style.display = 'flex';
+    pauseBtn.style.display = 'none';
+    isExternalControl = false;
+    stopVisualizer();
+    showVisualizerForCurrentTrack();
 }
 
 function loadTrack(index, autoPlay = true) {
@@ -278,12 +645,19 @@ function loadTrack(index, autoPlay = true) {
     audio.addEventListener('loadedmetadata', () => {
         durationEl.textContent = formatTime(audio.duration);
     }, { once: true });
-    if (autoPlay && isPlaying) playTrack();
-    else { playBtn.style.display = 'flex'; pauseBtn.style.display = 'none'; }
+    if (autoPlay && isPlaying) {
+        playTrack();
+    } else {
+        playBtn.style.display = 'flex';
+        pauseBtn.style.display = 'none';
+        stopVisualizer();
+        showVisualizerForCurrentTrack();
+    }
     updateMediaSession(track);
     updatePlaybackState(isPlaying ? 'playing' : 'paused');
 }
 
+// ===== Остальные функции без изменений (повторяются из предыдущей версии) =====
 function updateTrackInfo(index) {
     const track = tracks[index];
     const truncate = (text, max) => text.length > max ? text.substring(0, max - 1) + '…' : text;
@@ -330,27 +704,6 @@ function formatTime(seconds) {
     return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
 }
 
-function playTrack() {
-    audio.play().then(() => {
-        isPlaying = true;
-        updateDiscordPresence();
-        playBtn.style.display = 'none';
-        pauseBtn.style.display = 'flex';
-        isExternalControl = false;
-        updatePlaybackState('playing');
-        updatePlaybackState('paused');
-    }).catch(() => { showNotification('Playback failed'); });
-}
-
-function pauseTrack() {
-    audio.pause();
-    isPlaying = false;
-    updateDiscordPresence();
-    playBtn.style.display = 'flex';
-    pauseBtn.style.display = 'none';
-    isExternalControl = false;
-}
-
 function nextTrack() {
     if (tracks.length === 0) return;
     let nextIndex = currentTrackIndex + 1;
@@ -392,7 +745,7 @@ function toggleRepeat() {
     } else {
         document.getElementById('repeat-status').textContent = 'repeat mode:  none';
     }
-    config.saveSettings(volumeSlider.value, libraryFolder, repeatMode, discordRpcEnabled, currentTheme);
+    config.saveSettings(volumeSlider.value, libraryFolder, repeatMode, discordRpcEnabled, currentTheme, matugenEnabled);
 }
 
 function showNotification(message, duration = 3000) {
@@ -802,7 +1155,7 @@ settingsModal.addEventListener('click', (e) => {
 
 discordRpcToggle.addEventListener('change', (e) => {
     discordRpcEnabled = e.target.checked;
-    config.saveSettings(volumeSlider.value, libraryFolder, repeatMode, discordRpcEnabled, currentTheme);
+    config.saveSettings(volumeSlider.value, libraryFolder, repeatMode, discordRpcEnabled, currentTheme, matugenEnabled);
     if (!discordRpcEnabled) {
         ipcRenderer.send('update-presence', null);
     } else {
@@ -812,10 +1165,49 @@ discordRpcToggle.addEventListener('change', (e) => {
     }
 });
 
+rpcRestartBtn.addEventListener('click', () => {
+    ipcRenderer.send('rpc-reconnect');
+    showNotification('RPC reconnecting...');
+});
+
 themeToggle.addEventListener('change', (e) => {
+    if (matugenEnabled) return;
     const newTheme = e.target.checked ? 'light' : 'dark';
     applyTheme(newTheme);
-    config.saveSettings(volumeSlider.value, libraryFolder, repeatMode, discordRpcEnabled, newTheme);
+    config.saveSettings(volumeSlider.value, libraryFolder, repeatMode, discordRpcEnabled, newTheme, matugenEnabled);
+});
+
+matugenToggle.addEventListener('change', (e) => {
+    if (os.platform() === 'win32') {
+        showNotification('Matugen is not supported on Windows');
+        e.target.checked = false;
+        return;
+    }
+    matugenEnabled = e.target.checked;
+    if (matugenEnabled) {
+        const hasColors = loadMatugenColors();
+        if (!hasColors) {
+            showNotification('Matugen config not found, disabling');
+            matugenEnabled = false;
+            matugenToggle.checked = false;
+            themeToggle.disabled = false;
+            themeToggle.parentElement.parentElement.style.opacity = '1';
+            themeToggle.parentElement.parentElement.style.pointerEvents = 'auto';
+            config.saveSettings(volumeSlider.value, libraryFolder, repeatMode, discordRpcEnabled, currentTheme, false);
+            return;
+        }
+        applyMatugenTheme();
+        themeToggle.disabled = true;
+        themeToggle.parentElement.parentElement.style.opacity = '0.5';
+        themeToggle.parentElement.parentElement.style.pointerEvents = 'none';
+        config.saveSettings(volumeSlider.value, libraryFolder, repeatMode, discordRpcEnabled, currentTheme, true);
+    } else {
+        themeToggle.disabled = false;
+        themeToggle.parentElement.parentElement.style.opacity = '1';
+        themeToggle.parentElement.parentElement.style.pointerEvents = 'auto';
+        applyTheme(currentTheme);
+        config.saveSettings(volumeSlider.value, libraryFolder, repeatMode, discordRpcEnabled, currentTheme, false);
+    }
 });
 
 document.addEventListener('keydown', e => {
@@ -886,7 +1278,7 @@ document.addEventListener('keydown', e => {
         let newVol = Math.min(100, audio.volume * 100 + 5);
         audio.volume = newVol / 100;
         volumeSlider.value = newVol;
-        config.saveSettings(volumeSlider.value, libraryFolder, repeatMode, discordRpcEnabled, currentTheme);
+        config.saveSettings(volumeSlider.value, libraryFolder, repeatMode, discordRpcEnabled, currentTheme, matugenEnabled);
         showNotification(`Volume: ${Math.round(newVol)}%`, 800);
         return;
     }
@@ -895,7 +1287,7 @@ document.addEventListener('keydown', e => {
         let newVol = Math.max(0, audio.volume * 100 - 5);
         audio.volume = newVol / 100;
         volumeSlider.value = newVol;
-        config.saveSettings(volumeSlider.value, libraryFolder, repeatMode, discordRpcEnabled, currentTheme);
+        config.saveSettings(volumeSlider.value, libraryFolder, repeatMode, discordRpcEnabled, currentTheme, matugenEnabled);
         showNotification(`Volume: ${Math.round(newVol)}%`, 800);
         return;
     }
@@ -946,7 +1338,7 @@ document.addEventListener('keydown', e => {
         return;
     }
 
-    if (e.ctrlKey && e.code === 'KeyZ') {
+    if (e.ctrlKey && e.code === 'KeyT') {
         e.preventDefault();
         const lib = document.querySelector('.library-section');
         if (lib) lib.classList.toggle('collapsed');
@@ -993,7 +1385,7 @@ progressSlider.addEventListener('input', e => {
         updateDiscordPresence();
     }
 });
-volumeSlider.addEventListener('input', e => { audio.volume = e.target.value / 100; config.saveSettings(volumeSlider.value, libraryFolder, repeatMode, discordRpcEnabled, currentTheme); });
+volumeSlider.addEventListener('input', e => { audio.volume = e.target.value / 100; config.saveSettings(volumeSlider.value, libraryFolder, repeatMode, discordRpcEnabled, currentTheme, matugenEnabled); });
 audio.addEventListener('ended', () => {
     if (repeatMode === 'one') { audio.currentTime = 0; playTrack(); }
     else if (repeatMode === 'all') nextTrack();
@@ -1095,9 +1487,6 @@ function updateMediaSession(track) {
             album: track.album,
             artwork: track.cover ? [{ src: track.cover, sizes: '512x512', type: 'image/jpeg' }] : []
         });
-        console.log('MPRIS metadata updated');
-    } else {
-        console.warn('MediaSession API is not supported');
     }
 }
 
@@ -1140,6 +1529,24 @@ document.addEventListener('DOMContentLoaded', () => {
         applyTheme('dark');
         if (themeToggle) themeToggle.checked = false;
     }
+    if (saved.matugenEnabled !== undefined) {
+        matugenEnabled = saved.matugenEnabled;
+        if (matugenToggle) matugenToggle.checked = matugenEnabled;
+    } else {
+        matugenEnabled = false;
+        if (matugenToggle) matugenToggle.checked = false;
+    }
+    if (os.platform() === 'win32') {
+        matugenToggle.disabled = true;
+        matugenToggle.parentElement.parentElement.style.opacity = '0.5';
+        matugenToggle.parentElement.parentElement.style.pointerEvents = 'none';
+        if (matugenEnabled) {
+            matugenEnabled = false;
+            matugenToggle.checked = false;
+        }
+    }
+    watchMatugenFile();
+    updateMatugenState();
     if (saved.libraryPath && fs.existsSync(saved.libraryPath)) {
         libraryFolder = saved.libraryPath;
         libraryPath.textContent = path.basename(libraryFolder);

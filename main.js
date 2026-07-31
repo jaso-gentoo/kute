@@ -1,6 +1,12 @@
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
+const fs = require('fs');
 const { Client } = require('@xhayper/discord-rpc');
+
+app.setPath('userData', path.join(app.getPath('home'), '.cache', 'kute-player', 'electron'));
+app.setPath('cache', path.join(app.getPath('home'), '.cache', 'kute-player', 'electron'));
+app.setPath('crashDumps', path.join(app.getPath('home'), '.cache', 'kute-player', 'electron', 'Crashpad'));
+app.setPath('logs', path.join(app.getPath('home'), '.cache', 'kute-player', 'electron', 'logs'));
 
 app.commandLine.appendSwitch('enable-features', 'UseOzonePlatform');
 app.commandLine.appendSwitch('ozone-platform', 'wayland');
@@ -123,6 +129,19 @@ ipcMain.on('rpc-reconnect', () => {
 });
 
 app.whenReady().then(() => {
+    const home = app.getPath('home');
+    const configDir = path.join(home, '.config', 'kute-player');
+    const electronDataDir = path.join(home, '.cache', 'kute-player', 'electron');
+
+    if (!fs.existsSync(electronDataDir)) {
+        fs.mkdirSync(electronDataDir, { recursive: true });
+    }
+    // Убедимся, что пути установлены (повторно, на всякий случай)
+    app.setPath('userData', electronDataDir);
+    app.setPath('cache', electronDataDir);
+    app.setPath('crashDumps', path.join(electronDataDir, 'Crashpad'));
+    app.setPath('logs', path.join(electronDataDir, 'logs'));
+
     createWindow();
     initDiscordRPC();
 });

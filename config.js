@@ -13,21 +13,36 @@ const CONFIG_FILE = path.join(CONFIG_DIR, 'settings.json');
 function loadSettings() {
     try {
         if (!fs.existsSync(CONFIG_FILE)) {
-            return { volume: 80, libraryPath: '', repeatMode: 'none', discordRpcEnabled: true, theme: 'dark' };
+            return {
+                volume: 80,
+                libraryPath: '',
+                repeatMode: 'none',
+                discordRpcEnabled: true,
+                theme: 'dark',
+                matugenEnabled: false
+            };
         }
         const data = fs.readFileSync(CONFIG_FILE, 'utf8');
         const settings = JSON.parse(data);
         if (settings.repeatMode === undefined) settings.repeatMode = 'none';
         if (settings.discordRpcEnabled === undefined) settings.discordRpcEnabled = true;
         if (settings.theme === undefined) settings.theme = 'dark';
+        if (settings.matugenEnabled === undefined) settings.matugenEnabled = false;
         return settings;
     } catch (error) {
-        return { volume: 80, libraryPath: '', repeatMode: 'none', discordRpcEnabled: true, theme: 'dark' };
+        return {
+            volume: 80,
+            libraryPath: '',
+            repeatMode: 'none',
+            discordRpcEnabled: true,
+            theme: 'dark',
+            matugenEnabled: false
+        };
     }
 }
 
 let saveTimer = null;
-function saveSettings(volume, libraryPath, repeatMode, discordRpcEnabled, theme) {
+function saveSettings(volume, libraryPath, repeatMode, discordRpcEnabled, theme, matugenEnabled) {
     if (saveTimer) clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
         try {
@@ -40,6 +55,7 @@ function saveSettings(volume, libraryPath, repeatMode, discordRpcEnabled, theme)
                 repeatMode: repeatMode || 'none',
                 discordRpcEnabled: discordRpcEnabled,
                 theme: theme || 'dark',
+                matugenEnabled: matugenEnabled !== undefined ? matugenEnabled : false,
                 version: version
             };
             fs.writeFileSync(CONFIG_FILE, JSON.stringify(settings, null, 2));
