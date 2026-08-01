@@ -698,25 +698,29 @@ body {
 }
 
 .playlist-container-small::-webkit-scrollbar,
-#lyrics-textarea::-webkit-scrollbar {
+#lyrics-textarea::-webkit-scrollbar,
+#lyrics-display::-webkit-scrollbar {
     width: 6px;
     height: 6px;
 }
 
 .playlist-container-small::-webkit-scrollbar-track,
-#lyrics-textarea::-webkit-scrollbar-track {
+#lyrics-textarea::-webkit-scrollbar-track,
+#lyrics-display::-webkit-scrollbar-track {
     background: rgba(255, 255, 255, 0.02);
     border-radius: 3px;
 }
 
 .playlist-container-small::-webkit-scrollbar-thumb,
-#lyrics-textarea::-webkit-scrollbar-thumb {
+#lyrics-textarea::-webkit-scrollbar-thumb,
+#lyrics-display::-webkit-scrollbar-thumb {
     background: var(--bg-scrollbar);
     border-radius: 3px;
 }
 
 .playlist-container-small::-webkit-scrollbar-thumb:hover,
-#lyrics-textarea::-webkit-scrollbar-thumb:hover {
+#lyrics-textarea::-webkit-scrollbar-thumb:hover,
+#lyrics-display::-webkit-scrollbar-thumb:hover {
     background: var(--bg-scrollbar-hover);
 }
 
@@ -1190,16 +1194,37 @@ input:disabled + .slider {
     padding-top: 12px;
 }
 
-#lyrics-textarea::-webkit-scrollbar {
-    width: 6px;
+#lyrics-display {
+    flex: 1;
+    width: 100%;
+    padding: 12px 20px;
+    overflow-y: auto;
+    font-size: 1.1rem;
+    line-height: 1.6;
+    text-align: center;
+    color: var(--text-primary);
+    scroll-behavior: smooth;
+    white-space: pre-wrap;
+    font-family: 'Segoe UI', system-ui, monospace;
 }
-#lyrics-textarea::-webkit-scrollbar-track {
-    background: rgba(255,255,255,0.02);
-    border-radius: 3px;
+
+.lrc-line {
+    display: block;
+    padding: 2px 0;
+    opacity: 0.5;
+    color: var(--text-muted);
+    font-size: 1rem;
+    font-weight: 400;
+    transform: scale(1);
+    transition: opacity 0.5s cubic-bezier(0.23, 1, 0.32, 1), color 0.5s cubic-bezier(0.23, 1, 0.32, 1), transform 0.5s cubic-bezier(0.23, 1, 0.32, 1);
+    will-change: opacity, transform, color;
 }
-#lyrics-textarea::-webkit-scrollbar-thumb {
-    background: var(--bg-scrollbar);
-    border-radius: 3px;
+
+.lrc-line.active {
+    opacity: 1;
+    color: var(--text-primary);
+    font-weight: 600;
+    transform: scale(1.02);
 }
 
 .modal-header {
@@ -1421,4 +1446,99 @@ body.light-theme .settings-version-badge {
 
 .visualizer-canvas.visible {
     opacity: 0.8;
+}
+
+#lrc-offset-input {
+    width: 60px;
+    background: var(--bg-input);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 2px 6px;
+    color: var(--text-primary);
+    font-size: 12px;
+    text-align: center;
+    outline: none;
+}
+#lrc-offset-input:focus {
+    border-color: rgba(255,255,255,0.3);
+}
+
+.lyrics-player-controls {
+    flex-shrink: 0;
+    background: var(--bg-input);
+    border-radius: 12px;
+    padding: 8px 12px;
+    margin-top: 8px;
+    border: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    transition: background 0.2s, border-color 0.2s;
+}
+
+.lpc-top,
+.lpc-bottom {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.lpc-btn {
+    background: var(--bg-btn);
+    border: none;
+    border-radius: 50%;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-primary);
+    font-size: 12px;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.15s;
+    flex-shrink: 0;
+}
+
+.lpc-btn:hover {
+    background: var(--bg-btn-hover);
+    transform: scale(1.05);
+}
+
+.lpc-time {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+    min-width: 32px;
+    text-align: center;
+}
+
+.lpc-slider {
+    flex: 1;
+    height: 3px;
+    border-radius: 2px;
+    background: var(--bg-slider);
+    -webkit-appearance: none;
+    appearance: none;
+    outline: none;
+    cursor: pointer;
+}
+
+.lpc-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bg-slider-thumb);
+    cursor: pointer;
+}
+
+.lpc-volume-slider {
+    width: 100vh;
+    flex: 0 1 100vh;
+}
+
+.lpc-volume-icon {
+    color: var(--text-muted);
+    font-size: 13px;
 }

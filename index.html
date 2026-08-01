@@ -13,7 +13,7 @@
         <div class="window-header" id="window-header" data-tauri-drag-region>
             <div class="header-left">
                 <i class="fas fa-music"></i>
-                <span>kute :3 -- Made by Jasō</span>
+                <span>kute :3</span>
             </div>
             <div class="header-right">
                 <button id="lyrics-btn-small" class="header-action-btn" title="Show lyrics">
@@ -54,8 +54,21 @@
                 <div id="lyrics-modal" class="lyrics-modal">
                     <div class="modal-content">
                         <div class="modal-header">
-                            <h3>Lyrics</h3>
+                            <div style="display:flex; align-items:center; gap:8px; flex:1;">
+                                <h3 style="margin:0;">Lyrics</h3>
+                                <span id="lrc-offset-container" style="display:inline-flex; align-items:center; gap:4px; transition: opacity 0.3s ease, visibility 0.3s ease; visibility: hidden; opacity: 0;">
+                                    <span style="font-size:12px; color:var(--text-muted);">LRC offset</span>
+                                    <input type="text" id="lrc-offset-input"
+                                        value="0.25"
+                                        style="width:60px; background:var(--bg-input); border:1px solid var(--border-color);
+                                                border-radius:4px; padding:2px 6px; color:var(--text-primary); font-size:12px;
+                                                text-align:center; outline:none; transition: opacity 0.3s ease;">
+                                </span>
+                            </div>
                             <div class="modal-actions">
+                                <button id="lyrics-fetch-btn" class="modal-action-btn" title="Fetch synced lyrics from internet">
+                                    <i class="fas fa-cloud-download-alt"></i>
+                                </button>
                                 <button id="lyrics-load-btn" class="modal-action-btn" title="Load from file">
                                     <i class="fas fa-folder-open"></i>
                                 </button>
@@ -68,6 +81,22 @@
                             </div>
                         </div>
                         <textarea id="lyrics-textarea" placeholder="Lyrics will appear here..."></textarea>
+                        <div id="lyrics-display" class="lyrics-display" style="display: none;"></div>
+
+                        <div class="lyrics-player-controls">
+                            <div class="lpc-top">
+                                <button id="lpc-play-btn" class="lpc-btn" title="Play / Pause">
+                                    <i class="fas fa-play"></i>
+                                </button>
+                                <span id="lpc-current-time" class="lpc-time">0:00</span>
+                                <input type="range" id="lpc-progress" class="lpc-slider" min="0" max="100" value="0">
+                                <span id="lpc-duration" class="lpc-time">0:00</span>
+                            </div>
+                            <div class="lpc-bottom">
+                                <i class="fas fa-volume-up lpc-volume-icon"></i>
+                                <input type="range" id="lpc-volume" class="lpc-slider lpc-volume-slider" min="0" max="100" value="80">
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -169,6 +198,19 @@
                                                 <button id="rpc-restart-btn" class="lib-btn" style="width:100%; justify-content:center; margin-top:4px;">
                                                     <i class="fas fa-sync"></i> Restart RPC
                                                 </button>
+                                            </div>
+                                        </div>
+                                        <div class="settings-section">
+                                            <div class="settings-section-title">Lyrics</div>
+                                            <div class="settings-option">
+                                                <label class="switch-label">
+                                                    <span class="switch-text">LRC Support</span>
+                                                    <div class="switch">
+                                                        <input type="checkbox" id="lrc-toggle" checked>
+                                                        <span class="slider"></span>
+                                                    </div>
+                                                </label>
+                                                <div class="settings-note">Enable synced lyrics (LRC) support</div>
                                             </div>
                                         </div>
                                         <div class="settings-section">

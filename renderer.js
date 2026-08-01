@@ -24,12 +24,22 @@ const durationEl = document.getElementById('duration-small');
 const trackTitle = document.getElementById('track-title-small');
 const trackArtist = document.getElementById('track-artist-small');
 
+const lpcPlayBtn = document.getElementById('lpc-play-btn');
+const lpcProgress = document.getElementById('lpc-progress');
+const lpcVolume = document.getElementById('lpc-volume');
+const lpcCurrentTime = document.getElementById('lpc-current-time');
+const lpcDuration = document.getElementById('lpc-duration');
+
 const lyricsBtn = document.getElementById('lyrics-btn-small');
 const lyricsModal = document.getElementById('lyrics-modal');
 const lyricsTextarea = document.getElementById('lyrics-textarea');
+const lyricsDisplay = document.getElementById('lyrics-display');
 const lyricsSaveBtn = document.getElementById('lyrics-save-btn');
 const lyricsLoadBtn = document.getElementById('lyrics-load-btn');
+const lyricsFetchBtn = document.getElementById('lyrics-fetch-btn');
 const lyricsCloseBtn = document.getElementById('lyrics-close-btn');
+const lrcOffsetInput = document.getElementById('lrc-offset-input');
+const lrcOffsetContainer = document.getElementById('lrc-offset-container');
 
 const editPlaylistBtn = document.getElementById('edit-playlist-btn');
 const searchInput = document.getElementById('track-search');
@@ -54,6 +64,7 @@ const CONFIG_DIR = path.join(os.homedir(), '.config', 'kute-player');
 const LYRICS_DIR = path.join(CONFIG_DIR, 'txts');
 const PLAYLIST_ORDER_FILE = path.join(CONFIG_DIR, 'playlist_order.json');
 const MATUGEN_FILE = path.join(CONFIG_DIR, 'matugen', 'kute.json');
+const OFFSETS_FILE = path.join(CONFIG_DIR, 'offsets.json');
 
 const editMetadataBtn = document.getElementById('edit-metadata-btn');
 const metadataModal = document.getElementById('metadata-modal');
@@ -77,6 +88,7 @@ const discordRpcToggle = document.getElementById('discord-rpc-toggle');
 const themeToggle = document.getElementById('theme-toggle');
 const matugenToggle = document.getElementById('matugen-toggle');
 const visualizerToggle = document.getElementById('visualizer-toggle');
+const lrcToggle = document.getElementById('lrc-toggle');
 const rpcRestartBtn = document.getElementById('rpc-restart-btn');
 const systemInfoEl = document.getElementById('system-info');
 
@@ -86,6 +98,7 @@ let matugenEnabled = false;
 let matugenColors = null;
 let matugenWatcher = null;
 let visualizerEnabled = true;
+let lrcEnabled = true;
 
 let currentCoverFile = null;
 let systemName = 'Unknown System';
@@ -98,6 +111,73 @@ let isVisualizerRunning = false;
 if (!fs.existsSync(LYRICS_DIR)) fs.mkdirSync(LYRICS_DIR, { recursive: true });
 
 let presenceStartTimestamp = null;
+let lrcData = null;
+let lastScrolledElement = null;
+let lrcLines = [];
+let lrcCache = new Map();
+
+let lrcOffsets = {};
+let currentLrcOffset = 0.25;
+let offsetSaveTimeout = null;
+
+function getOffsetForTrack(trackPath) {
+    if (lrcOffsets[trackPath] !== undefined) {
+        return lrcOffsets[trackPath];
+    }
+    return 0.25;
+}
+
+function saveOffsetForTrack(trackPath, offset) {
+    lrcOffsets[trackPath] = offset;
+    try {
+        fs.writeFileSync(OFFSETS_FILE, JSON.stringify(lrcOffsets, null, 2));
+    } catch (e) {
+        console.warn('Failed to save offset:', e);
+    }
+}
+
+function updateLrcOffsetField() {
+    if (!lrcOffsetContainer || !lrcOffsetInput) return;
+    const isLRC = lyricsTextarea.dataset.isLRC === 'true' && lrcData && lrcData.length > 0;
+    if (isLRC) {
+        lrcOffsetContainer.style.visibility = 'visible';
+        lrcOffsetContainer.style.opacity = '1';
+        if (isLyricsEditing) {
+            lrcOffsetInput.removeAttribute('readonly');
+            lrcOffsetInput.style.opacity = '1';
+            lrcOffsetInput.style.cursor = 'text';
+        } else {
+            lrcOffsetInput.setAttribute('readonly', true);
+            lrcOffsetInput.style.opacity = '0.5';
+            lrcOffsetInput.style.cursor = 'default';
+        }
+    } else {
+        lrcOffsetContainer.style.visibility = 'hidden';
+        lrcOffsetContainer.style.opacity = '0';
+        lrcOffsetInput.setAttribute('readonly', true);
+        lrcOffsetInput.style.opacity = '0.5';
+    }
+}
+
+function updateLpcPlayButton() {
+    if (!lpcPlayBtn) return;
+    const icon = lpcPlayBtn.querySelector('i');
+    if (isPlaying) {
+        icon.className = 'fas fa-pause';
+    } else {
+        icon.className = 'fas fa-play';
+    }
+}
+
+function syncLpcPanel() {
+    if (!lpcProgress || !lpcCurrentTime || !lpcDuration) return;
+    const p = (audio.currentTime / audio.duration) * 100 || 0;
+    lpcProgress.value = p;
+    lpcCurrentTime.textContent = formatTime(audio.currentTime);
+    lpcDuration.textContent = formatTime(audio.duration);
+    lpcVolume.value = audio.volume * 100;
+    updateLpcPlayButton();
+}
 
 function getSystemInfo() {
     const platform = os.platform();
@@ -248,9 +328,7 @@ function applyMatugenTheme() {
     const root = document.documentElement;
     const c = matugenColors;
     const isLight = isLightColor(c.background || '#121212');
-
     document.body.classList.remove('light-theme', 'dark-theme');
-
     const background = c.background || (isLight ? '#f5f5f5' : '#121212');
     const surface = c.surface || (isLight ? '#ffffff' : '#1e1e1e');
     const onBackground = c.onBackground || (isLight ? '#222' : '#e0e0e0');
@@ -318,7 +396,7 @@ function watchMatugenFile() {
                 showNotification('Matugen config invalid, disabling');
                 const settings = config.loadSettings();
                 settings.matugenEnabled = false;
-                config.saveSettings(settings.volume, settings.libraryPath, settings.repeatMode, settings.discordRpcEnabled, settings.theme, false, visualizerEnabled);
+                config.saveSettings(settings.volume, settings.libraryPath, settings.repeatMode, settings.discordRpcEnabled, settings.theme, false, visualizerEnabled, lrcEnabled);
             }
         }
     });
@@ -343,7 +421,7 @@ function updateMatugenState() {
             showNotification('Matugen config not found, disabling');
             const settings = config.loadSettings();
             settings.matugenEnabled = false;
-            config.saveSettings(settings.volume, settings.libraryPath, settings.repeatMode, settings.discordRpcEnabled, settings.theme, false, visualizerEnabled);
+            config.saveSettings(settings.volume, settings.libraryPath, settings.repeatMode, settings.discordRpcEnabled, settings.theme, false, visualizerEnabled, lrcEnabled);
         }
     } else {
         themeToggle.disabled = false;
@@ -363,47 +441,64 @@ selectLibraryBtn.addEventListener('click', async () => {
             libraryFolder = path.resolve(folderPath);
             libraryPath.textContent = path.basename(libraryFolder);
             loadTracksFromFolder(libraryFolder);
-            config.saveSettings(volumeSlider.value, libraryFolder, repeatMode, discordRpcEnabled, currentTheme, matugenEnabled, visualizerEnabled);
+            config.saveSettings(volumeSlider.value, libraryFolder, repeatMode, discordRpcEnabled, currentTheme, matugenEnabled, visualizerEnabled, lrcEnabled);
         }
     } catch (error) {
         showNotification('Error loading library');
     }
 });
 
+let isLoading = false;
+let loadAbortController = null;
+
 async function loadTracksFromFolder(folderPath) {
-    console.log('[DEBUG] loadTracksFromFolder:', folderPath);
+    if (isLoading) {
+        if (loadAbortController) loadAbortController.abort();
+    }
+    isLoading = true;
+    loadAbortController = new AbortController();
+    const signal = loadAbortController.signal;
+
     try {
-        const files = fs.readdirSync(folderPath);
+        const files = await fs.promises.readdir(folderPath);
         const trackPromises = [];
         for (const file of files) {
             if (file.toLowerCase().endsWith('.mp3')) {
-                trackPromises.push(parseTrackFile(folderPath, file));
+                trackPromises.push(parseTrackFile(folderPath, file, signal));
             }
         }
         const batchSize = 10;
         tracks = [];
         for (let i = 0; i < trackPromises.length; i += batchSize) {
+            if (signal.aborted) break;
             const batch = trackPromises.slice(i, i + batchSize);
             const batchResults = await Promise.allSettled(batch);
             batchResults.forEach(result => {
                 if (result.status === 'fulfilled' && result.value) tracks.push(result.value);
             });
         }
+        if (signal.aborted) return;
         loadPlaylistOrder();
         updateTrackList();
         trackCount.textContent = `${tracks.length} tracks`;
         saveOriginalTracks();
         if (tracks.length > 0) loadTrack(0, false);
     } catch (error) {
-        console.error('[DEBUG] loadTracksFromFolder error:', error);
-        showNotification('Failed to load tracks');
+        if (error.name !== 'AbortError') {
+            console.error('[DEBUG] loadTracksFromFolder error:', error);
+            showNotification('Failed to load tracks');
+        }
+    } finally {
+        isLoading = false;
+        loadAbortController = null;
     }
 }
 
-async function parseTrackFile(folderPath, filename) {
+async function parseTrackFile(folderPath, filename, signal) {
     const filePath = path.join(folderPath, filename);
     try {
         const metadata = await mm.parseFile(filePath);
+        if (signal.aborted) return null;
         let coverData = null;
         if (metadata.common?.picture?.length) {
             const picture = metadata.common.picture[0];
@@ -494,11 +589,6 @@ function refreshTrackList() {
         trackItem.appendChild(coverDiv);
         trackItem.appendChild(detailsDiv);
         trackItem.appendChild(vizCanvas);
-        trackItem.addEventListener('click', (e) => {
-            if (isPlaylistEditing) return;
-            loadTrack(index, true);
-            if (!isPlaying) playTrack();
-        });
         fragment.appendChild(trackItem);
     });
     trackList.innerHTML = '';
@@ -512,6 +602,14 @@ function refreshTrackList() {
     }
     showVisualizerForCurrentTrack();
 }
+
+trackList.addEventListener('click', (e) => {
+    const item = e.target.closest('.track-item-small');
+    if (!item || isPlaylistEditing) return;
+    const index = parseInt(item.dataset.index);
+    loadTrack(index, true);
+    if (!isPlaying) playTrack();
+});
 
 function showVisualizerForCurrentTrack() {
     const canvases = document.querySelectorAll('.visualizer-canvas');
@@ -611,6 +709,8 @@ function playTrack() {
             initAudioContext();
             startVisualizer();
         }
+        updateLyrics();
+        updateLpcPlayButton();
     }).catch(() => { showNotification('Playback failed'); });
 }
 
@@ -623,6 +723,7 @@ function pauseTrack() {
     isExternalControl = false;
     stopVisualizer();
     showVisualizerForCurrentTrack();
+    updateLpcPlayButton();
 }
 
 function loadTrack(index, autoPlay = true) {
@@ -637,6 +738,9 @@ function loadTrack(index, autoPlay = true) {
     updateActiveTrack(index);
     audio.addEventListener('loadedmetadata', () => {
         durationEl.textContent = formatTime(audio.duration);
+        if (lyricsModal.style.display === 'flex') {
+            lpcDuration.textContent = formatTime(audio.duration);
+        }
     }, { once: true });
     if (autoPlay && isPlaying) {
         playTrack();
@@ -648,6 +752,16 @@ function loadTrack(index, autoPlay = true) {
     }
     updateMediaSession(track);
     updatePlaybackState(isPlaying ? 'playing' : 'paused');
+    if (lyricsModal.style.display === 'flex') {
+        lastScrolledElement = null;
+        const offsetInput = document.getElementById('lrc-offset-input');
+        if (offsetInput && currentLyricsTrack) {
+            currentLrcOffset = getOffsetForTrack(currentLyricsTrack.path);
+            offsetInput.value = currentLrcOffset;
+        }
+        openLyrics(track);
+        syncLpcPanel();
+    }
 }
 
 function updateTrackInfo(index) {
@@ -737,7 +851,7 @@ function toggleRepeat() {
     } else {
         document.getElementById('repeat-status').textContent = 'repeat mode:  none';
     }
-    config.saveSettings(volumeSlider.value, libraryFolder, repeatMode, discordRpcEnabled, currentTheme, matugenEnabled, visualizerEnabled);
+    config.saveSettings(volumeSlider.value, libraryFolder, repeatMode, discordRpcEnabled, currentTheme, matugenEnabled, visualizerEnabled, lrcEnabled);
 }
 
 function showNotification(message, duration = 3000) {
@@ -771,39 +885,183 @@ function filterTracks(searchText) {
 }
 searchInput.addEventListener('input', e => filterTracks(e.target.value));
 
-function openLyrics(track) {
+
+function parseLRC(content) {
+    const lines = content.split('\n');
+    const parsed = [];
+    const timeRegex = /\[(\d{2}):(\d{2})\.(\d{2,3})\]/;
+    for (const line of lines) {
+        const match = line.match(timeRegex);
+        if (match) {
+            const minutes = parseInt(match[1]);
+            const seconds = parseInt(match[2]);
+            const millis = parseInt(match[3].padEnd(3, '0'));
+            const time = minutes * 60 + seconds + millis / 1000;
+            const text = line.replace(/\[.*?\]/, '').trim();
+            if (text) parsed.push({ time, text });
+        }
+    }
+    return parsed;
+}
+
+function renderLRC(linesArray) {
+    lrcLines = [];
+    lyricsDisplay.innerHTML = '';
+    linesArray.forEach(item => {
+        const span = document.createElement('span');
+        span.textContent = item.text;
+        span.className = 'lrc-line';
+        span.dataset.time = item.time;
+        lyricsDisplay.appendChild(span);
+        lrcLines.push(span);
+    });
+}
+
+function updateLyrics() {
+    if (!lrcData || lyricsDisplay.style.display === 'none') return;
+    if (!isPlaying) return;
+
+    const currentTime = audio.currentTime;
+    const offset = currentLyricsTrack ? getOffsetForTrack(currentLyricsTrack.path) : 0.25;
+    const adjustedTime = currentTime + offset;
+    let activeIndex = -1;
+    for (let i = 0; i < lrcData.length; i++) {
+        if (lrcData[i].time <= adjustedTime) activeIndex = i;
+        else break;
+    }
+
+    lrcLines.forEach((line, idx) => {
+        line.classList.toggle('active', idx === activeIndex);
+    });
+
+    if (activeIndex >= 0 && lrcLines[activeIndex]) {
+        const targetElement = lrcLines[activeIndex];
+        if (lastScrolledElement !== targetElement) {
+            targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            lastScrolledElement = targetElement;
+        }
+    }
+}
+
+function stopLyricsUpdate() {
+    lastScrolledElement = null;
+    lrcLines.forEach(el => el.classList.remove('active'));
+}
+
+async function fetchLRCFromInternet(trackName, artistName) {
+    const url = `https://lrclib.net/api/get?track_name=${encodeURIComponent(trackName)}&artist_name=${encodeURIComponent(artistName)}`;
+    try {
+        const response = await fetch(url);
+        if (!response.ok) return null;
+        const data = await response.json();
+        if (data.syncedLyrics) {
+            return data.syncedLyrics;
+        }
+        return null;
+    } catch {
+        return null;
+    }
+}
+
+
+async function openLyrics(track) {
     if (!track) return;
     currentLyricsTrack = track;
-    const lyricsPath = path.join(LYRICS_DIR, `${track.name}.txt`);
-    try {
-        lyricsTextarea.value = fs.existsSync(lyricsPath) ? fs.readFileSync(lyricsPath, 'utf-8') : '';
-    } catch (e) {
-        lyricsTextarea.value = '';
+    lastScrolledElement = null;
+
+    const lrcPath = path.join(LYRICS_DIR, `${track.name}.lrc`);
+    const txtPath = path.join(LYRICS_DIR, `${track.name}.txt`);
+
+    let content = '';
+    let isLRC = false;
+
+    if (lrcEnabled) {
+        if (fs.existsSync(lrcPath)) {
+            content = fs.readFileSync(lrcPath, 'utf-8');
+            isLRC = true;
+        }
     }
+    if (!isLRC && fs.existsSync(txtPath)) {
+        content = fs.readFileSync(txtPath, 'utf-8');
+        isLRC = false;
+    }
+
+    lyricsTextarea.value = content;
+    lyricsTextarea.dataset.isLRC = isLRC ? 'true' : 'false';
+    lyricsFetchBtn.style.display = lrcEnabled ? 'flex' : 'none';
+
+    if (isLRC) {
+        currentLrcOffset = getOffsetForTrack(track.path);
+        lrcOffsetInput.value = currentLrcOffset;
+    }
+
+    if (isLRC && content.trim()) {
+        if (lrcCache.has(track.path)) {
+            lrcData = lrcCache.get(track.path);
+        } else {
+            lrcData = parseLRC(content);
+            lrcCache.set(track.path, lrcData);
+        }
+        renderLRC(lrcData);
+        lyricsDisplay.style.display = 'block';
+        lyricsTextarea.style.display = 'none';
+        updateLyrics();
+    } else {
+        lrcData = null;
+        lyricsDisplay.style.display = 'none';
+        lyricsTextarea.style.display = 'block';
+        stopLyricsUpdate();
+    }
+
     isLyricsEditing = false;
     lyricsTextarea.readOnly = true;
     lyricsTextarea.style.cursor = 'default';
     lyricsSaveBtn.innerHTML = '<i class="fas fa-edit"></i>';
+
+    updateLrcOffsetField();
+
     lyricsModal.style.display = 'flex';
     setTimeout(() => lyricsModal.classList.add('show'), 10);
+
+    syncLpcPanel();
 }
 
 function closeLyrics() {
+    if (offsetSaveTimeout) {
+        clearTimeout(offsetSaveTimeout);
+        offsetSaveTimeout = null;
+    }
     if (isLyricsEditing) {
         isLyricsEditing = false;
         lyricsTextarea.readOnly = true;
         lyricsTextarea.style.cursor = 'default';
         lyricsSaveBtn.innerHTML = '<i class="fas fa-edit"></i>';
-        const lyricsPath = path.join(LYRICS_DIR, `${currentLyricsTrack.name}.txt`);
-        try {
-            lyricsTextarea.value = fs.existsSync(lyricsPath) ? fs.readFileSync(lyricsPath, 'utf-8') : '';
-        } catch (e) { }
+        const track = currentLyricsTrack;
+        if (track) {
+            const lrcPath = path.join(LYRICS_DIR, `${track.name}.lrc`);
+            const txtPath = path.join(LYRICS_DIR, `${track.name}.txt`);
+            if (lrcEnabled && fs.existsSync(lrcPath)) {
+                lyricsTextarea.value = fs.readFileSync(lrcPath, 'utf-8');
+            } else if (fs.existsSync(txtPath)) {
+                lyricsTextarea.value = fs.readFileSync(txtPath, 'utf-8');
+            }
+        }
     }
     lyricsModal.classList.remove('show');
+    stopLyricsUpdate();
     setTimeout(() => {
         lyricsModal.style.display = 'none';
+        lyricsDisplay.innerHTML = '';
+        lrcData = null;
+        lrcLines = [];
+        lastScrolledElement = null;
+        if (lrcOffsetContainer) {
+            lrcOffsetContainer.style.visibility = 'hidden';
+            lrcOffsetContainer.style.opacity = '0';
+        }
     }, 300);
 }
+
 
 lyricsBtn.addEventListener('click', () => {
     if (tracks[currentTrackIndex]) {
@@ -813,17 +1071,72 @@ lyricsBtn.addEventListener('click', () => {
     }
 });
 
+lyricsFetchBtn.addEventListener('click', async () => {
+    if (!lrcEnabled) {
+        showNotification('LRC support is disabled in settings');
+        return;
+    }
+    if (!currentLyricsTrack) {
+        showNotification('No track loaded');
+        return;
+    }
+    const track = currentLyricsTrack;
+    const lrc = await fetchLRCFromInternet(track.name, track.artist);
+    if (lrc) {
+        const lrcPath = path.join(LYRICS_DIR, `${track.name}.lrc`);
+        try {
+            fs.writeFileSync(lrcPath, lrc, 'utf-8');
+            lrcCache.delete(track.path);
+            openLyrics(track);
+            showNotification('Synced lyrics downloaded and saved');
+        } catch (err) {
+            showNotification('Error saving lyrics file');
+        }
+    } else {
+        showNotification('No synced lyrics found for this track');
+    }
+});
+
+lyricsLoadBtn.addEventListener('click', async () => {
+    if (!currentLyricsTrack) return;
+    const result = await ipcRenderer.invoke('select-file', {
+        title: 'Select lyrics file',
+        filters: [{ name: 'Text Files', extensions: ['txt', 'lrc'] }, { name: 'All Files', extensions: ['*'] }],
+        properties: ['openFile']
+    });
+    if (result.filePaths && result.filePaths[0]) {
+        try {
+            const content = fs.readFileSync(result.filePaths[0], 'utf-8');
+            const ext = path.extname(result.filePaths[0]).toLowerCase();
+            const isLRC = ext === '.lrc';
+            const savePath = path.join(LYRICS_DIR, `${currentLyricsTrack.name}${ext}`);
+            fs.writeFileSync(savePath, content, 'utf-8');
+            lrcCache.delete(currentLyricsTrack.path);
+            openLyrics(currentLyricsTrack);
+            showNotification('Lyrics loaded and saved');
+        } catch (e) {
+            showNotification('Error loading file');
+        }
+    }
+});
+
 lyricsSaveBtn.addEventListener('click', () => {
     if (!currentLyricsTrack) return;
-    const lyricsPath = path.join(LYRICS_DIR, `${currentLyricsTrack.name}.txt`);
     if (isLyricsEditing) {
+        const newContent = lyricsTextarea.value;
+        const isLRC = lyricsTextarea.dataset.isLRC === 'true';
+        const ext = isLRC ? '.lrc' : '.txt';
+        const filePath = path.join(LYRICS_DIR, `${currentLyricsTrack.name}${ext}`);
         try {
-            fs.writeFileSync(lyricsPath, lyricsTextarea.value, 'utf-8');
+            fs.writeFileSync(filePath, newContent, 'utf-8');
+            lrcCache.delete(currentLyricsTrack.path);
             showNotification('Lyrics saved');
             isLyricsEditing = false;
             lyricsTextarea.readOnly = true;
             lyricsTextarea.style.cursor = 'default';
             lyricsSaveBtn.innerHTML = '<i class="fas fa-edit"></i>';
+            updateLrcOffsetField();
+            openLyrics(currentLyricsTrack);
         } catch (err) {
             showNotification('Error saving lyrics');
         }
@@ -832,32 +1145,14 @@ lyricsSaveBtn.addEventListener('click', () => {
         lyricsTextarea.readOnly = false;
         lyricsTextarea.style.cursor = 'text';
         lyricsTextarea.focus();
-        lyricsSaveBtn.innerHTML = '<i class="fas fa-save"></i>';
-        showNotification('Edit mode enabled', 2000);
-    }
-});
-
-lyricsLoadBtn.addEventListener('click', async () => {
-    if (!currentLyricsTrack) return;
-    const result = await ipcRenderer.invoke('select-file', {
-        title: 'Select lyrics file',
-        filters: [{ name: 'Text Files', extensions: ['txt'] }, { name: 'All Files', extensions: ['*'] }],
-        properties: ['openFile']
-    });
-    if (result.filePaths && result.filePaths[0]) {
-        try {
-            const content = fs.readFileSync(result.filePaths[0], 'utf-8');
-            lyricsTextarea.value = content;
-            showNotification('Lyrics loaded');
-            if (!isLyricsEditing) {
-                isLyricsEditing = true;
-                lyricsTextarea.readOnly = false;
-                lyricsTextarea.style.cursor = 'text';
-                lyricsSaveBtn.innerHTML = '<i class="fas fa-save"></i>';
-            }
-        } catch (e) {
-            showNotification('Error loading file');
+        if (lyricsDisplay.style.display === 'block') {
+            lyricsDisplay.style.display = 'none';
+            lyricsTextarea.style.display = 'block';
+            stopLyricsUpdate();
         }
+        lyricsSaveBtn.innerHTML = '<i class="fas fa-save"></i>';
+        updateLrcOffsetField();
+        showNotification('Edit mode enabled', 2000);
     }
 });
 
@@ -865,6 +1160,70 @@ lyricsCloseBtn.addEventListener('click', closeLyrics);
 lyricsModal.addEventListener('click', (e) => {
     if (e.target === lyricsModal) closeLyrics();
 });
+
+lrcOffsetInput.addEventListener('input', (e) => {
+    if (!currentLyricsTrack) return;
+    clearTimeout(offsetSaveTimeout);
+    offsetSaveTimeout = setTimeout(() => {
+        const val = parseFloat(e.target.value);
+        if (!isNaN(val)) {
+            currentLrcOffset = val;
+            saveOffsetForTrack(currentLyricsTrack.path, val);
+            if (isPlaying && lrcData) {
+                updateLyrics();
+            }
+        } else {
+            e.target.value = currentLrcOffset;
+        }
+    }, 300);
+});
+
+lrcOffsetInput.addEventListener('change', (e) => {
+    if (!currentLyricsTrack) return;
+    const val = parseFloat(e.target.value);
+    if (!isNaN(val)) {
+        currentLrcOffset = val;
+        saveOffsetForTrack(currentLyricsTrack.path, val);
+        if (isPlaying && lrcData) {
+            updateLyrics();
+        }
+    } else {
+        e.target.value = currentLrcOffset;
+    }
+});
+
+lpcPlayBtn.addEventListener('click', () => {
+    if (isPlaying) {
+        pauseTrack();
+    } else {
+        playTrack();
+    }
+    updateLpcPlayButton();
+});
+
+lpcProgress.addEventListener('input', (e) => {
+    const val = parseFloat(e.target.value);
+    if (!isNaN(audio.duration)) {
+        audio.currentTime = (val / 100) * audio.duration;
+        lpcCurrentTime.textContent = formatTime(audio.currentTime);
+    }
+});
+
+lpcVolume.addEventListener('input', (e) => {
+    const val = parseFloat(e.target.value);
+    audio.volume = val / 100;
+    volumeSlider.value = val;
+    config.saveSettings(volumeSlider.value, libraryFolder, repeatMode, discordRpcEnabled, currentTheme, matugenEnabled, visualizerEnabled, lrcEnabled);
+});
+
+try {
+    if (fs.existsSync(OFFSETS_FILE)) {
+        lrcOffsets = JSON.parse(fs.readFileSync(OFFSETS_FILE, 'utf-8'));
+    }
+} catch (e) {
+    lrcOffsets = {};
+}
+
 
 function initPlaylistEditing() {
     editPlaylistBtn.addEventListener('click', togglePlaylistEditMode);
@@ -1161,7 +1520,7 @@ document.querySelectorAll('.settings-tab').forEach(tab => {
 
 discordRpcToggle.addEventListener('change', (e) => {
     discordRpcEnabled = e.target.checked;
-    config.saveSettings(volumeSlider.value, libraryFolder, repeatMode, discordRpcEnabled, currentTheme, matugenEnabled, visualizerEnabled);
+    config.saveSettings(volumeSlider.value, libraryFolder, repeatMode, discordRpcEnabled, currentTheme, matugenEnabled, visualizerEnabled, lrcEnabled);
     if (!discordRpcEnabled) {
         ipcRenderer.send('update-presence', null);
     } else {
@@ -1180,7 +1539,7 @@ themeToggle.addEventListener('change', (e) => {
     if (matugenEnabled) return;
     const newTheme = e.target.checked ? 'light' : 'dark';
     applyTheme(newTheme);
-    config.saveSettings(volumeSlider.value, libraryFolder, repeatMode, discordRpcEnabled, newTheme, matugenEnabled, visualizerEnabled);
+    config.saveSettings(volumeSlider.value, libraryFolder, repeatMode, discordRpcEnabled, newTheme, matugenEnabled, visualizerEnabled, lrcEnabled);
 });
 
 matugenToggle.addEventListener('change', (e) => {
@@ -1199,26 +1558,26 @@ matugenToggle.addEventListener('change', (e) => {
             themeToggle.disabled = false;
             themeToggle.parentElement.parentElement.style.opacity = '1';
             themeToggle.parentElement.parentElement.style.pointerEvents = 'auto';
-            config.saveSettings(volumeSlider.value, libraryFolder, repeatMode, discordRpcEnabled, currentTheme, false, visualizerEnabled);
+            config.saveSettings(volumeSlider.value, libraryFolder, repeatMode, discordRpcEnabled, currentTheme, false, visualizerEnabled, lrcEnabled);
             return;
         }
         applyMatugenTheme();
         themeToggle.disabled = true;
         themeToggle.parentElement.parentElement.style.opacity = '0.5';
         themeToggle.parentElement.parentElement.style.pointerEvents = 'none';
-        config.saveSettings(volumeSlider.value, libraryFolder, repeatMode, discordRpcEnabled, currentTheme, true, visualizerEnabled);
+        config.saveSettings(volumeSlider.value, libraryFolder, repeatMode, discordRpcEnabled, currentTheme, true, visualizerEnabled, lrcEnabled);
     } else {
         themeToggle.disabled = false;
         themeToggle.parentElement.parentElement.style.opacity = '1';
         themeToggle.parentElement.parentElement.style.pointerEvents = 'auto';
         applyTheme(currentTheme);
-        config.saveSettings(volumeSlider.value, libraryFolder, repeatMode, discordRpcEnabled, currentTheme, false, visualizerEnabled);
+        config.saveSettings(volumeSlider.value, libraryFolder, repeatMode, discordRpcEnabled, currentTheme, false, visualizerEnabled, lrcEnabled);
     }
 });
 
 visualizerToggle.addEventListener('change', (e) => {
     visualizerEnabled = e.target.checked;
-    config.saveSettings(volumeSlider.value, libraryFolder, repeatMode, discordRpcEnabled, currentTheme, matugenEnabled, visualizerEnabled);
+    config.saveSettings(volumeSlider.value, libraryFolder, repeatMode, discordRpcEnabled, currentTheme, matugenEnabled, visualizerEnabled, lrcEnabled);
     if (!visualizerEnabled) {
         stopVisualizer();
         document.querySelectorAll('.visualizer-canvas').forEach(c => c.classList.remove('visible'));
@@ -1230,6 +1589,14 @@ visualizerToggle.addEventListener('change', (e) => {
                 startVisualizer();
             }
         }
+    }
+});
+
+lrcToggle.addEventListener('change', (e) => {
+    lrcEnabled = e.target.checked;
+    config.saveSettings(volumeSlider.value, libraryFolder, repeatMode, discordRpcEnabled, currentTheme, matugenEnabled, visualizerEnabled, lrcEnabled);
+    if (lyricsModal.style.display === 'flex' && currentLyricsTrack) {
+        openLyrics(currentLyricsTrack);
     }
 });
 
@@ -1301,7 +1668,7 @@ document.addEventListener('keydown', e => {
         let newVol = Math.min(100, audio.volume * 100 + 5);
         audio.volume = newVol / 100;
         volumeSlider.value = newVol;
-        config.saveSettings(volumeSlider.value, libraryFolder, repeatMode, discordRpcEnabled, currentTheme, matugenEnabled, visualizerEnabled);
+        config.saveSettings(volumeSlider.value, libraryFolder, repeatMode, discordRpcEnabled, currentTheme, matugenEnabled, visualizerEnabled, lrcEnabled);
         showNotification(`Volume: ${Math.round(newVol)}%`, 800);
         return;
     }
@@ -1310,7 +1677,7 @@ document.addEventListener('keydown', e => {
         let newVol = Math.max(0, audio.volume * 100 - 5);
         audio.volume = newVol / 100;
         volumeSlider.value = newVol;
-        config.saveSettings(volumeSlider.value, libraryFolder, repeatMode, discordRpcEnabled, currentTheme, matugenEnabled, visualizerEnabled);
+        config.saveSettings(volumeSlider.value, libraryFolder, repeatMode, discordRpcEnabled, currentTheme, matugenEnabled, visualizerEnabled, lrcEnabled);
         showNotification(`Volume: ${Math.round(newVol)}%`, 800);
         return;
     }
@@ -1388,8 +1755,22 @@ nextBtn.addEventListener('click', nextTrack);
 prevBtn.addEventListener('click', prevTrack);
 repeatBtn.addEventListener('click', toggleRepeat);
 
-audio.addEventListener('play', () => { if (!isExternalControl) { isPlaying = true; playBtn.style.display = 'none'; pauseBtn.style.display = 'flex'; } });
-audio.addEventListener('pause', () => { if (!isExternalControl) { isPlaying = false; playBtn.style.display = 'flex'; pauseBtn.style.display = 'none'; } });
+audio.addEventListener('play', () => {
+    if (!isExternalControl) {
+        isPlaying = true;
+        playBtn.style.display = 'none';
+        pauseBtn.style.display = 'flex';
+        updateLpcPlayButton();
+    }
+});
+audio.addEventListener('pause', () => {
+    if (!isExternalControl) {
+        isPlaying = false;
+        playBtn.style.display = 'flex';
+        pauseBtn.style.display = 'none';
+        updateLpcPlayButton();
+    }
+});
 if ('mediaSession' in navigator) {
     navigator.mediaSession.setActionHandler('play', () => { isExternalControl = true; playTrack(); });
     navigator.mediaSession.setActionHandler('pause', () => { isExternalControl = true; pauseTrack(); });
@@ -1400,6 +1781,12 @@ audio.addEventListener('timeupdate', () => {
     const p = (audio.currentTime / audio.duration) * 100 || 0;
     progressSlider.value = p;
     currentTimeEl.textContent = formatTime(audio.currentTime);
+    updateLyrics();
+    if (lyricsModal.style.display === 'flex') {
+        lpcProgress.value = p;
+        lpcCurrentTime.textContent = formatTime(audio.currentTime);
+        lpcDuration.textContent = formatTime(audio.duration);
+    }
 });
 progressSlider.addEventListener('input', e => {
     audio.currentTime = (e.target.value / 100) * audio.duration;
@@ -1408,7 +1795,7 @@ progressSlider.addEventListener('input', e => {
         updateDiscordPresence();
     }
 });
-volumeSlider.addEventListener('input', e => { audio.volume = e.target.value / 100; config.saveSettings(volumeSlider.value, libraryFolder, repeatMode, discordRpcEnabled, currentTheme, matugenEnabled, visualizerEnabled); });
+volumeSlider.addEventListener('input', e => { audio.volume = e.target.value / 100; config.saveSettings(volumeSlider.value, libraryFolder, repeatMode, discordRpcEnabled, currentTheme, matugenEnabled, visualizerEnabled, lrcEnabled); });
 audio.addEventListener('ended', () => {
     if (repeatMode === 'one') { audio.currentTime = 0; playTrack(); }
     else if (repeatMode === 'all') nextTrack();
@@ -1472,34 +1859,52 @@ async function saveMetadata() {
     if (!newTitle) { showNotification('Title cannot be empty'); return; }
     try {
         const NodeID3 = require('node-id3');
-        const tags = { title: newTitle, artist: newArtist, album: newAlbum };
+        const existingTags = NodeID3.read(track.path) || {};
+        const tags = {
+            title: newTitle,
+            artist: newArtist,
+            album: newAlbum
+        };
         if (currentCoverFile) {
             const reader = new FileReader();
-            reader.onload = ev => {
-                tags.image = { mime: currentCoverFile.type, type: { id: 3 }, description: 'Cover', imageBuffer: Buffer.from(ev.target.result) };
-                if (NodeID3.write(tags, track.path)) updateTrackAfterSave(track, newTitle, newArtist, newAlbum, true);
-                else throw new Error('Failed to write tags');
+            const coverBuffer = await new Promise((resolve, reject) => {
+                reader.onload = () => resolve(Buffer.from(reader.result));
+                reader.onerror = reject;
+                reader.readAsArrayBuffer(currentCoverFile);
+            });
+            tags.image = {
+                mime: currentCoverFile.type,
+                type: { id: 3 },
+                description: 'Cover',
+                imageBuffer: coverBuffer
             };
-            reader.readAsArrayBuffer(currentCoverFile);
         } else {
-            if (NodeID3.write(tags, track.path)) updateTrackAfterSave(track, newTitle, newArtist, newAlbum, false);
-            else throw new Error('Failed to write tags');
+            if (existingTags.image) {
+                tags.image = existingTags.image;
+            }
         }
-    } catch (e) { showNotification('Error saving metadata'); }
-}
-function updateTrackAfterSave(track, title, artist, album, coverChanged) {
-    track.name = title; track.artist = artist; track.album = album;
-    if (coverChanged && currentCoverFile) {
-        if (track.cover?.startsWith('blob:')) URL.revokeObjectURL(track.cover);
-        track.cover = URL.createObjectURL(currentCoverFile);
+        const success = NodeID3.write(tags, track.path);
+        if (success) {
+            track.name = newTitle;
+            track.artist = newArtist;
+            track.album = newAlbum;
+            if (currentCoverFile) {
+                if (track.cover?.startsWith('blob:')) URL.revokeObjectURL(track.cover);
+                track.cover = URL.createObjectURL(currentCoverFile);
+            }
+            const idx = originalTracks.findIndex(t => t.path === track.path);
+            if (idx !== -1) originalTracks[idx] = { ...track };
+            updateTrackInfo(currentTrackIndex);
+            updateAlbumArt(track.cover, track.name);
+            refreshTrackList();
+            showNotification('Metadata saved successfully');
+            closeMetadataModal();
+        } else {
+            showNotification('Failed to write tags');
+        }
+    } catch (e) {
+        showNotification('Error saving metadata: ' + e.message);
     }
-    const idx = originalTracks.findIndex(t => t.path === track.path);
-    if (idx !== -1) originalTracks[idx] = { ...track };
-    updateTrackInfo(currentTrackIndex);
-    updateAlbumArt(track.cover, track.name);
-    refreshTrackList();
-    showNotification('Metadata saved successfully');
-    closeMetadataModal();
 }
 
 function updateMediaSession(track) {
@@ -1566,6 +1971,18 @@ document.addEventListener('DOMContentLoaded', () => {
         visualizerEnabled = true;
         if (visualizerToggle) visualizerToggle.checked = true;
     }
+    if (saved.lrcEnabled !== undefined) {
+        lrcEnabled = saved.lrcEnabled;
+        if (lrcToggle) lrcToggle.checked = lrcEnabled;
+    } else {
+        lrcEnabled = true;
+        if (lrcToggle) lrcToggle.checked = true;
+    }
+    if (fs.existsSync(OFFSETS_FILE)) {
+        try {
+            lrcOffsets = JSON.parse(fs.readFileSync(OFFSETS_FILE, 'utf-8'));
+        } catch (e) { lrcOffsets = {}; }
+    }
     if (os.platform() === 'win32') {
         matugenToggle.disabled = true;
         matugenToggle.parentElement.parentElement.style.opacity = '0.5';
@@ -1621,6 +2038,12 @@ metadataCancelBtn.addEventListener('click', closeMetadataModal);
 window.addEventListener('click', e => { if (e.target === metadataModal) closeMetadataModal(); });
 window.addEventListener('resize', updateSizes);
 window.addEventListener('beforeunload', () => {
-    tracks.forEach(t => { if (t.cover?.startsWith('blob:')) URL.revokeObjectURL(t.cover); });
-    if (audio.src?.startsWith('blob:')) URL.revokeObjectURL(audio.src);
+    tracks.forEach(t => {
+        if (t.cover && t.cover.startsWith('blob:')) {
+            URL.revokeObjectURL(t.cover);
+        }
+    });
+    if (audio.src && audio.src.startsWith('blob:')) {
+        URL.revokeObjectURL(audio.src);
+    }
 });
