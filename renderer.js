@@ -57,7 +57,6 @@ const MATUGEN_FILE = path.join(CONFIG_DIR, 'matugen', 'kute.json');
 
 const editMetadataBtn = document.getElementById('edit-metadata-btn');
 const metadataModal = document.getElementById('metadata-modal');
-const metadataModalClose = document.querySelector('.metadata-modal-close');
 const metadataCoverPreview = document.getElementById('metadata-cover-preview');
 const metadataCoverBtn = document.getElementById('metadata-cover-btn');
 const metadataCoverInput = document.getElementById('metadata-cover-input');
@@ -77,6 +76,7 @@ const settingsCloseBtn = document.getElementById('settings-close-btn');
 const discordRpcToggle = document.getElementById('discord-rpc-toggle');
 const themeToggle = document.getElementById('theme-toggle');
 const matugenToggle = document.getElementById('matugen-toggle');
+const visualizerToggle = document.getElementById('visualizer-toggle');
 const rpcRestartBtn = document.getElementById('rpc-restart-btn');
 const systemInfoEl = document.getElementById('system-info');
 
@@ -85,11 +85,11 @@ let currentTheme = 'dark';
 let matugenEnabled = false;
 let matugenColors = null;
 let matugenWatcher = null;
+let visualizerEnabled = true;
 
 let currentCoverFile = null;
 let systemName = 'Unknown System';
 
-// --- AudioContext для визуализатора ---
 let audioCtx = null;
 let analyser = null;
 let dataArray = null;
@@ -99,7 +99,6 @@ if (!fs.existsSync(LYRICS_DIR)) fs.mkdirSync(LYRICS_DIR, { recursive: true });
 
 let presenceStartTimestamp = null;
 
-// ========== ОПРЕДЕЛЕНИЕ СИСТЕМЫ ==========
 function getSystemInfo() {
     const platform = os.platform();
     if (platform === 'win32') return 'Windows ' + (os.release() || '');
@@ -123,7 +122,6 @@ function getSystemInfo() {
 
 systemName = getSystemInfo();
 
-// Обновляем системную информацию в настройках (если элемент уже загружен)
 const sysInfoEl = document.getElementById('system-info');
 if (sysInfoEl) {
     sysInfoEl.textContent = systemName;
@@ -250,21 +248,18 @@ function applyMatugenTheme() {
     const root = document.documentElement;
     const c = matugenColors;
     const isLight = isLightColor(c.background || '#121212');
-    if (isLight) {
-        document.body.classList.add('light-theme');
-        document.body.classList.remove('dark-theme');
-    } else {
-        document.body.classList.add('dark-theme');
-        document.body.classList.remove('light-theme');
-    }
-    const primary = c.primary || (isLight ? '#6200ee' : '#bb86fc');
+
+    document.body.classList.remove('light-theme', 'dark-theme');
+
     const background = c.background || (isLight ? '#f5f5f5' : '#121212');
     const surface = c.surface || (isLight ? '#ffffff' : '#1e1e1e');
     const onBackground = c.onBackground || (isLight ? '#222' : '#e0e0e0');
     const onSurface = c.onSurface || (isLight ? '#222' : '#e0e0e0');
-    const primaryContainer = c.primaryContainer || (isLight ? '#e0d0ff' : '#4a2a7a');
-    const onPrimaryContainer = c.onPrimaryContainer || (isLight ? '#220055' : '#d0b0ff');
+    const primary = c.primary || (isLight ? '#6200ee' : '#bb86fc');
     const secondary = c.secondary || '#03dac6';
+    const surfaceVariant = c.surfaceVariant || (isLight ? '#e0e0e0' : '#444444');
+    const outline = c.outline || (isLight ? '#aaaaaa' : '#888888');
+
     root.style.setProperty('--bg-primary', background);
     root.style.setProperty('--bg-secondary', surface);
     root.style.setProperty('--bg-header', surface);
@@ -280,10 +275,10 @@ function applyMatugenTheme() {
     root.style.setProperty('--bg-slider-thumb', isLight ? '#222' : '#c0c0c0');
     root.style.setProperty('--bg-scrollbar', isLight ? '#ccc' : '#5a5a5a');
     root.style.setProperty('--bg-scrollbar-hover', isLight ? '#aaa' : '#7a7a7a');
-    root.style.setProperty('--bg-modal', isLight ? 'rgba(245,245,245,0.95)' : 'rgba(20,20,20,0.95)');
+    root.style.setProperty('--bg-modal', surface);
     root.style.setProperty('--bg-modal-overlay', 'rgba(0,0,0,0.2)');
-    root.style.setProperty('--bg-switch-off', isLight ? '#ccc' : '#555');
-    root.style.setProperty('--bg-switch-on', isLight ? '#444' : 'white');
+    root.style.setProperty('--bg-switch-off', surfaceVariant);
+    root.style.setProperty('--bg-switch-on', primary);
     root.style.setProperty('--bg-btn', isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.03)');
     root.style.setProperty('--bg-btn-hover', isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.06)');
     root.style.setProperty('--border-color', isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.05)');
@@ -323,7 +318,7 @@ function watchMatugenFile() {
                 showNotification('Matugen config invalid, disabling');
                 const settings = config.loadSettings();
                 settings.matugenEnabled = false;
-                config.saveSettings(settings.volume, settings.libraryPath, settings.repeatMode, settings.discordRpcEnabled, settings.theme, false);
+                config.saveSettings(settings.volume, settings.libraryPath, settings.repeatMode, settings.discordRpcEnabled, settings.theme, false, visualizerEnabled);
             }
         }
     });
@@ -348,7 +343,7 @@ function updateMatugenState() {
             showNotification('Matugen config not found, disabling');
             const settings = config.loadSettings();
             settings.matugenEnabled = false;
-            config.saveSettings(settings.volume, settings.libraryPath, settings.repeatMode, settings.discordRpcEnabled, settings.theme, false);
+            config.saveSettings(settings.volume, settings.libraryPath, settings.repeatMode, settings.discordRpcEnabled, settings.theme, false, visualizerEnabled);
         }
     } else {
         themeToggle.disabled = false;
@@ -368,7 +363,7 @@ selectLibraryBtn.addEventListener('click', async () => {
             libraryFolder = path.resolve(folderPath);
             libraryPath.textContent = path.basename(libraryFolder);
             loadTracksFromFolder(libraryFolder);
-            config.saveSettings(volumeSlider.value, libraryFolder, repeatMode, discordRpcEnabled, currentTheme, matugenEnabled);
+            config.saveSettings(volumeSlider.value, libraryFolder, repeatMode, discordRpcEnabled, currentTheme, matugenEnabled, visualizerEnabled);
         }
     } catch (error) {
         showNotification('Error loading library');
@@ -487,7 +482,6 @@ function refreshTrackList() {
         detailsDiv.appendChild(nameDiv);
         detailsDiv.appendChild(infoDiv);
 
-        // --- Визуализатор (cava-style) ---
         const vizCanvas = document.createElement('canvas');
         vizCanvas.className = 'visualizer-canvas';
         vizCanvas.width = 40;
@@ -495,7 +489,6 @@ function refreshTrackList() {
         vizCanvas.style.width = '40px';
         vizCanvas.style.height = '24px';
         vizCanvas.style.marginLeft = 'auto';
-        vizCanvas.style.display = 'none';
         vizCanvas.dataset.trackIndex = index;
 
         trackItem.appendChild(coverDiv);
@@ -524,15 +517,14 @@ function showVisualizerForCurrentTrack() {
     const canvases = document.querySelectorAll('.visualizer-canvas');
     canvases.forEach((canvas) => {
         const idx = parseInt(canvas.dataset.trackIndex);
-        if (idx === currentTrackIndex && isPlaying) {
-            canvas.style.display = 'block';
+        if (idx === currentTrackIndex && isPlaying && visualizerEnabled) {
+            canvas.classList.add('visible');
         } else {
-            canvas.style.display = 'none';
+            canvas.classList.remove('visible');
         }
     });
 }
 
-// --- Функции визуализатора (cava-стиль + зеркальное отражение) ---
 function initAudioContext() {
     if (!audioCtx) {
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -546,6 +538,7 @@ function initAudioContext() {
 }
 
 function startVisualizer() {
+    if (!visualizerEnabled) return;
     if (isVisualizerRunning) return;
     if (!audioCtx) initAudioContext();
     isVisualizerRunning = true;
@@ -565,7 +558,7 @@ function startVisualizer() {
     const halfBars = Math.floor(numBars / 2);
 
     function draw() {
-        if (!isVisualizerRunning || !isPlaying) {
+        if (!isVisualizerRunning || !isPlaying || !visualizerEnabled) {
             isVisualizerRunning = false;
             return;
         }
@@ -579,11 +572,9 @@ function startVisualizer() {
             const barHeight = Math.max(1, percent * centerY);
             const xLeft = (halfBars - 1 - i) * (barWidth + gap) + gap/2;
             const xRight = (halfBars + i) * (barWidth + gap) + gap/2;
-            // Левая сторона
             ctx.fillStyle = color;
             ctx.fillRect(xLeft, centerY - barHeight, barWidth, barHeight);
             ctx.fillRect(xLeft, centerY, barWidth, barHeight);
-            // Правая сторона (зеркально)
             ctx.fillRect(xRight, centerY - barHeight, barWidth, barHeight);
             ctx.fillRect(xRight, centerY, barWidth, barHeight);
         }
@@ -596,12 +587,14 @@ function stopVisualizer() {
     isVisualizerRunning = false;
     const canvases = document.querySelectorAll('.visualizer-canvas');
     canvases.forEach(c => {
-        const ctx = c.getContext('2d');
-        ctx.clearRect(0, 0, c.width, c.height);
+        c.classList.remove('visible');
+        setTimeout(() => {
+            const ctx = c.getContext('2d');
+            ctx.clearRect(0, 0, c.width, c.height);
+        }, 300);
     });
 }
 
-// --- Переопределение функций воспроизведения (с остановкой старого визуализатора) ---
 function playTrack() {
     if (isVisualizerRunning) {
         stopVisualizer();
@@ -614,7 +607,7 @@ function playTrack() {
         isExternalControl = false;
         updatePlaybackState('playing');
         showVisualizerForCurrentTrack();
-        if (!isVisualizerRunning) {
+        if (!isVisualizerRunning && visualizerEnabled) {
             initAudioContext();
             startVisualizer();
         }
@@ -657,7 +650,6 @@ function loadTrack(index, autoPlay = true) {
     updatePlaybackState(isPlaying ? 'playing' : 'paused');
 }
 
-// ===== Остальные функции без изменений (повторяются из предыдущей версии) =====
 function updateTrackInfo(index) {
     const track = tracks[index];
     const truncate = (text, max) => text.length > max ? text.substring(0, max - 1) + '…' : text;
@@ -745,7 +737,7 @@ function toggleRepeat() {
     } else {
         document.getElementById('repeat-status').textContent = 'repeat mode:  none';
     }
-    config.saveSettings(volumeSlider.value, libraryFolder, repeatMode, discordRpcEnabled, currentTheme, matugenEnabled);
+    config.saveSettings(volumeSlider.value, libraryFolder, repeatMode, discordRpcEnabled, currentTheme, matugenEnabled, visualizerEnabled);
 }
 
 function showNotification(message, duration = 3000) {
@@ -1153,9 +1145,23 @@ settingsModal.addEventListener('click', (e) => {
     if (e.target === settingsModal) closeSettingsModal();
 });
 
+document.querySelectorAll('.settings-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+        document.querySelectorAll('.settings-tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        const pageId = tab.dataset.tab;
+        const pagesWrapper = document.querySelector('.settings-pages');
+        if (pageId === 'general') {
+            pagesWrapper.classList.remove('shifted');
+        } else {
+            pagesWrapper.classList.add('shifted');
+        }
+    });
+});
+
 discordRpcToggle.addEventListener('change', (e) => {
     discordRpcEnabled = e.target.checked;
-    config.saveSettings(volumeSlider.value, libraryFolder, repeatMode, discordRpcEnabled, currentTheme, matugenEnabled);
+    config.saveSettings(volumeSlider.value, libraryFolder, repeatMode, discordRpcEnabled, currentTheme, matugenEnabled, visualizerEnabled);
     if (!discordRpcEnabled) {
         ipcRenderer.send('update-presence', null);
     } else {
@@ -1174,7 +1180,7 @@ themeToggle.addEventListener('change', (e) => {
     if (matugenEnabled) return;
     const newTheme = e.target.checked ? 'light' : 'dark';
     applyTheme(newTheme);
-    config.saveSettings(volumeSlider.value, libraryFolder, repeatMode, discordRpcEnabled, newTheme, matugenEnabled);
+    config.saveSettings(volumeSlider.value, libraryFolder, repeatMode, discordRpcEnabled, newTheme, matugenEnabled, visualizerEnabled);
 });
 
 matugenToggle.addEventListener('change', (e) => {
@@ -1193,20 +1199,37 @@ matugenToggle.addEventListener('change', (e) => {
             themeToggle.disabled = false;
             themeToggle.parentElement.parentElement.style.opacity = '1';
             themeToggle.parentElement.parentElement.style.pointerEvents = 'auto';
-            config.saveSettings(volumeSlider.value, libraryFolder, repeatMode, discordRpcEnabled, currentTheme, false);
+            config.saveSettings(volumeSlider.value, libraryFolder, repeatMode, discordRpcEnabled, currentTheme, false, visualizerEnabled);
             return;
         }
         applyMatugenTheme();
         themeToggle.disabled = true;
         themeToggle.parentElement.parentElement.style.opacity = '0.5';
         themeToggle.parentElement.parentElement.style.pointerEvents = 'none';
-        config.saveSettings(volumeSlider.value, libraryFolder, repeatMode, discordRpcEnabled, currentTheme, true);
+        config.saveSettings(volumeSlider.value, libraryFolder, repeatMode, discordRpcEnabled, currentTheme, true, visualizerEnabled);
     } else {
         themeToggle.disabled = false;
         themeToggle.parentElement.parentElement.style.opacity = '1';
         themeToggle.parentElement.parentElement.style.pointerEvents = 'auto';
         applyTheme(currentTheme);
-        config.saveSettings(volumeSlider.value, libraryFolder, repeatMode, discordRpcEnabled, currentTheme, false);
+        config.saveSettings(volumeSlider.value, libraryFolder, repeatMode, discordRpcEnabled, currentTheme, false, visualizerEnabled);
+    }
+});
+
+visualizerToggle.addEventListener('change', (e) => {
+    visualizerEnabled = e.target.checked;
+    config.saveSettings(volumeSlider.value, libraryFolder, repeatMode, discordRpcEnabled, currentTheme, matugenEnabled, visualizerEnabled);
+    if (!visualizerEnabled) {
+        stopVisualizer();
+        document.querySelectorAll('.visualizer-canvas').forEach(c => c.classList.remove('visible'));
+    } else {
+        if (isPlaying) {
+            showVisualizerForCurrentTrack();
+            if (!isVisualizerRunning) {
+                initAudioContext();
+                startVisualizer();
+            }
+        }
     }
 });
 
@@ -1278,7 +1301,7 @@ document.addEventListener('keydown', e => {
         let newVol = Math.min(100, audio.volume * 100 + 5);
         audio.volume = newVol / 100;
         volumeSlider.value = newVol;
-        config.saveSettings(volumeSlider.value, libraryFolder, repeatMode, discordRpcEnabled, currentTheme, matugenEnabled);
+        config.saveSettings(volumeSlider.value, libraryFolder, repeatMode, discordRpcEnabled, currentTheme, matugenEnabled, visualizerEnabled);
         showNotification(`Volume: ${Math.round(newVol)}%`, 800);
         return;
     }
@@ -1287,7 +1310,7 @@ document.addEventListener('keydown', e => {
         let newVol = Math.max(0, audio.volume * 100 - 5);
         audio.volume = newVol / 100;
         volumeSlider.value = newVol;
-        config.saveSettings(volumeSlider.value, libraryFolder, repeatMode, discordRpcEnabled, currentTheme, matugenEnabled);
+        config.saveSettings(volumeSlider.value, libraryFolder, repeatMode, discordRpcEnabled, currentTheme, matugenEnabled, visualizerEnabled);
         showNotification(`Volume: ${Math.round(newVol)}%`, 800);
         return;
     }
@@ -1385,7 +1408,7 @@ progressSlider.addEventListener('input', e => {
         updateDiscordPresence();
     }
 });
-volumeSlider.addEventListener('input', e => { audio.volume = e.target.value / 100; config.saveSettings(volumeSlider.value, libraryFolder, repeatMode, discordRpcEnabled, currentTheme, matugenEnabled); });
+volumeSlider.addEventListener('input', e => { audio.volume = e.target.value / 100; config.saveSettings(volumeSlider.value, libraryFolder, repeatMode, discordRpcEnabled, currentTheme, matugenEnabled, visualizerEnabled); });
 audio.addEventListener('ended', () => {
     if (repeatMode === 'one') { audio.currentTime = 0; playTrack(); }
     else if (repeatMode === 'all') nextTrack();
@@ -1536,6 +1559,13 @@ document.addEventListener('DOMContentLoaded', () => {
         matugenEnabled = false;
         if (matugenToggle) matugenToggle.checked = false;
     }
+    if (saved.visualizerEnabled !== undefined) {
+        visualizerEnabled = saved.visualizerEnabled;
+        if (visualizerToggle) visualizerToggle.checked = visualizerEnabled;
+    } else {
+        visualizerEnabled = true;
+        if (visualizerToggle) visualizerToggle.checked = true;
+    }
     if (os.platform() === 'win32') {
         matugenToggle.disabled = true;
         matugenToggle.parentElement.parentElement.style.opacity = '0.5';
@@ -1577,10 +1607,13 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
+    if (!visualizerEnabled) {
+        stopVisualizer();
+        document.querySelectorAll('.visualizer-canvas').forEach(c => c.classList.remove('visible'));
+    }
 });
 
 editMetadataBtn.addEventListener('click', openMetadataModal);
-metadataModalClose.addEventListener('click', closeMetadataModal);
 metadataCoverBtn.addEventListener('click', () => metadataCoverInput.click());
 metadataCoverInput.addEventListener('change', handleCoverInput);
 metadataSaveBtn.addEventListener('click', saveMetadata);

@@ -1,24 +1,33 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport"
-        content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Kute</title>
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
-
 <body class="prevent-select">
     <input type="file" id="folder-input" webkitdirectory directory multiple style="display: none;">
     <div class="app-container">
         <div class="window-header" id="window-header" data-tauri-drag-region>
             <div class="header-left">
                 <i class="fas fa-music"></i>
-                <span>kute</span>
+                <span>kute :3 -- Made by Jasō</span>
             </div>
             <div class="header-right">
+                <button id="lyrics-btn-small" class="header-action-btn" title="Show lyrics">
+                    <i class="fas fa-file-alt"></i>
+                </button>
+                <button id="shortcuts-btn-small" class="header-action-btn" title="Keyboard shortcuts">
+                    <i class="fas fa-keyboard"></i>
+                </button>
+                <button id="edit-metadata-btn" class="header-action-btn" title="Edit track metadata">
+                    <i class="fas fa-edit"></i>
+                </button>
+                <button id="settings-btn-small" class="header-action-btn" title="Settings">
+                    <i class="fas fa-cog"></i>
+                </button>
                 <div class="window-controls">
                     <button class="win-btn maximize" id="maximize-btn" title="Maximize">
                         <i class="fas fa-square"></i>
@@ -32,25 +41,9 @@
 
         <div class="app-content">
             <div class="player-section">
-                <div class="top-left-buttons">
-                    <button id="lyrics-btn-small" class="lyrics-btn" title="Show lyrics">
-                        <i class="fas fa-file-alt"></i>
-                    </button>
-                    <button id="shortcuts-btn-small" class="shortcuts-btn" title="Keyboard shortcuts">
-                        <i class="fas fa-keyboard"></i>
-                    </button>
-                    <button id="edit-metadata-btn" class="edit-metadata-btn" title="Edit track metadata">
-                        <i class="fas fa-edit"></i>
-                    </button>
-                    <button id="settings-btn-small" class="settings-btn" title="Settings">
-                        <i class="fas fa-cog"></i>
-                    </button>
-                </div>
-
                 <div class="album-art-small" id="album-art-small">
                     <i class="fas fa-music"></i>
                 </div>
-
                 <div class="track-info-small">
                     <div id="track-title-small" class="track-title-small">No track</div>
                     <div class="track-artist-small">
@@ -59,29 +52,37 @@
                 </div>
 
                 <div id="lyrics-modal" class="lyrics-modal">
-                    <div class="lyrics-overlay">
-                        <div class="lyrics-content">
-                            <textarea id="lyrics-textarea" placeholder="Lyrics will appear here..."></textarea>
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h3>Lyrics</h3>
+                            <div class="modal-actions">
+                                <button id="lyrics-load-btn" class="modal-action-btn" title="Load from file">
+                                    <i class="fas fa-folder-open"></i>
+                                </button>
+                                <button id="lyrics-save-btn" class="modal-action-btn" title="Edit / Save">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button id="lyrics-close-btn" class="modal-close-btn" title="Close">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
                         </div>
-                        <div class="lyrics-actions">
-                            <button id="lyrics-load-btn" class="lyrics-action-btn" title="Load from file">
-                                <i class="fas fa-folder-open"></i>
-                            </button>
-                            <button id="lyrics-save-btn" class="lyrics-action-btn" title="Edit / Save">
-                                <i class="fas fa-edit"></i>
-                            </button>
-                            <button id="lyrics-close-btn" class="lyrics-action-btn" title="Close">
-                                <i class="fas fa-times"></i>
-                            </button>
-                        </div>
+                        <textarea id="lyrics-textarea" placeholder="Lyrics will appear here..."></textarea>
                     </div>
                 </div>
 
                 <div id="metadata-modal" class="metadata-modal">
-                    <div class="metadata-modal-content">
+                    <div class="modal-content">
                         <div class="metadata-modal-header">
-                            <h3 id="metadata-modal-title">Edit Track Metadata</h3>
-                            <button class="metadata-modal-close" title="Close"></button>
+                            <h3>Edit Track Metadata</h3>
+                            <div class="modal-actions">
+                                <button id="metadata-save-btn" class="modal-action-btn" title="Save">
+                                    <i class="fas fa-save"></i>
+                                </button>
+                                <button id="metadata-cancel-btn" class="modal-close-btn" title="Cancel">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
                         </div>
                         <div class="metadata-modal-body">
                             <div class="metadata-cover-section">
@@ -96,122 +97,128 @@
                             <div class="metadata-fields">
                                 <div class="metadata-field">
                                     <label for="metadata-title"><i class="fas fa-heading"></i> Title</label>
-                                    <input type="text" id="metadata-title" class="metadata-input"
-                                        placeholder="Track title">
+                                    <input type="text" id="metadata-title" class="metadata-input" placeholder="Track title">
                                 </div>
                                 <div class="metadata-field">
                                     <label for="metadata-artist"><i class="fas fa-user"></i> Artist</label>
-                                    <input type="text" id="metadata-artist" class="metadata-input"
-                                        placeholder="Artist name">
+                                    <input type="text" id="metadata-artist" class="metadata-input" placeholder="Artist name">
                                 </div>
                                 <div class="metadata-field">
                                     <label for="metadata-album"><i class="fas fa-compact-disc"></i> Album</label>
-                                    <input type="text" id="metadata-album" class="metadata-input"
-                                        placeholder="Album name">
+                                    <input type="text" id="metadata-album" class="metadata-input" placeholder="Album name">
                                 </div>
                             </div>
-                        </div>
-                        <div class="metadata-modal-footer">
-                            <button id="metadata-save-btn" class="metadata-btn-save">
-                                <i class="fas fa-save"></i>
-                            </button>
-                            <button id="metadata-cancel-btn" class="metadata-btn-cancel">
-                                <i class="fas fa-times"></i>
-                            </button>
                         </div>
                     </div>
                 </div>
 
                 <div id="shortcuts-modal" class="shortcuts-modal">
-                    <div class="shortcuts-overlay">
-                        <div class="shortcuts-content">
-                            <div class="shortcuts-text">
-                                <h3>Keyboard Shortcuts</h3>
-                                <ul>
-                                    <li><kbd>Space</kbd> - Play / Pause</li>
-                                    <li><kbd>↑</kbd> / <kbd>↓</kbd> - Previous / Next track</li>
-                                    <li><kbd>←</kbd> / <kbd>→</kbd> - Volume -/+ 5%</li>
-                                    <li><kbd>Ctrl+←</kbd> / <kbd>Ctrl+→</kbd> - Seek -/+ 5 sec</li>
-                                    <li><kbd>Ctrl+X</kbd> - Edit metadata</li>
-                                    <li><kbd>Ctrl+S</kbd> - Save lyrics / metadata</li>
-                                    <li><kbd>Ctrl+D</kbd> - Show lyrics</li>
-                                    <li><kbd>Ctrl+/</kbd> - Open shortcuts</li>
-                                    <li><kbd>Ctrl+E</kbd> - Open settings</li>
-                                    <li><kbd>Ctrl+O</kbd> - Select directory</li>
-                                    <li><kbd>Ctrl+T</kbd> - Hide/show library panel</li>
-                                    <li><kbd>Ctrl+Shift+E</kbd> - Edit playlist order</li>
-                                    <li><kbd>Esc</kbd> - Close menu</li>
-                                </ul>
-                            </div>
-                        </div>
-                        <div class="shortcuts-actions">
-                            <button id="shortcuts-close-btn" class="shortcuts-action-btn" title="Close">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h3>Keyboard Shortcuts</h3>
+                            <button id="shortcuts-close-btn" class="modal-close-btn" title="Close">
                                 <i class="fas fa-times"></i>
                             </button>
                         </div>
+                        <ul>
+                            <li><kbd>Space</kbd> - Play / Pause</li>
+                            <li><kbd>↑</kbd> / <kbd>↓</kbd> - Previous / Next track</li>
+                            <li><kbd>←</kbd> / <kbd>→</kbd> - Volume -/+ 5%</li>
+                            <li><kbd>Ctrl+←</kbd> / <kbd>Ctrl+→</kbd> - Seek -/+ 5 sec</li>
+                            <li><kbd>Ctrl+X</kbd> - Edit metadata</li>
+                            <li><kbd>Ctrl+S</kbd> - Save lyrics / metadata</li>
+                            <li><kbd>Ctrl+D</kbd> - Show lyrics</li>
+                            <li><kbd>Ctrl+/</kbd> - Open shortcuts</li>
+                            <li><kbd>Ctrl+E</kbd> - Open settings</li>
+                            <li><kbd>Ctrl+O</kbd> - Select directory</li>
+                            <li><kbd>Ctrl+T</kbd> - Hide/show library panel</li>
+                            <li><kbd>Ctrl+Shift+E</kbd> - Edit playlist order</li>
+                            <li><kbd>Esc</kbd> - Close menu</li>
+                        </ul>
                     </div>
                 </div>
 
                 <div id="settings-modal" class="settings-modal">
-                    <div class="settings-overlay">
-                        <div class="settings-container">
-                            <div class="settings-header">
-                                <h3>Settings <span id="settings-version" class="settings-version-badge"></span></h3>
-                            </div>
-                            <div class="settings-body">
-                                <div class="settings-section">
-                                    <div class="settings-section-title">Integrations</div>
-                                    <div class="settings-option">
-                                        <label class="switch-label">
-                                            <span class="switch-text">Discord Rich Presence</span>
-                                            <div class="switch">
-                                                <input type="checkbox" id="discord-rpc-toggle">
-                                                <span class="slider"></span>
-                                            </div>
-                                        </label>
-                                    </div>
-                                    <div class="settings-option">
-                                        <button id="rpc-restart-btn" class="lib-btn" style="width:100%; justify-content:center; margin-top:4px;">
-                                            <i class="fas fa-sync"></i> Restart RPC
-                                        </button>
-                                    </div>
-                                </div>
-                                <div class="settings-section">
-                                    <div class="settings-section-title">Appearance</div>
-                                    <div class="settings-option">
-                                        <label class="switch-label">
-                                            <span class="switch-text">Light Theme</span>
-                                            <div class="switch">
-                                                <input type="checkbox" id="theme-toggle">
-                                                <span class="slider"></span>
-                                            </div>
-                                        </label>
-                                        <div class="settings-note">Switch between light and dark mode</div>
-                                    </div>
-                                    <div class="settings-option">
-                                        <label class="switch-label">
-                                            <span class="switch-text">Matugen</span>
-                                            <div class="switch">
-                                                <input type="checkbox" id="matugen-toggle">
-                                                <span class="slider"></span>
-                                            </div>
-                                        </label>
-                                        <div class="settings-note">Theme colors from wallpaper</div>
-                                    </div>
-                                </div>
-                                <div class="settings-section">
-                                    <div class="settings-section-title">System</div>
-                                    <div class="settings-option" style="display:flex; justify-content:space-between; align-items:center;">
-                                        <span class="switch-text" style="font-weight:normal;">Operating System</span>
-                                        <span id="system-info" style="color: var(--text-secondary); font-size:0.9rem;">Unknown</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="settings-actions">
-                            <button id="settings-close-btn" class="settings-action-btn" title="Close">
+                    <div class="modal-content">
+                        <div class="settings-header">
+                            <h3>Settings <span id="settings-version" class="settings-version-badge"></span></h3>
+                            <button id="settings-close-btn" class="modal-close-btn" title="Close">
                                 <i class="fas fa-times"></i>
                             </button>
+                        </div>
+                        <div class="settings-tabs">
+                            <button class="settings-tab active" data-tab="general">General</button>
+                            <button class="settings-tab" data-tab="visualizer">Appearance</button>
+                        </div>
+                        <div class="settings-body">
+                            <div class="settings-pages-wrapper">
+                                <div class="settings-pages">
+                                    <div class="settings-page" id="settings-page-general">
+                                        <div class="settings-section">
+                                            <div class="settings-section-title">Integrations</div>
+                                            <div class="settings-option">
+                                                <label class="switch-label">
+                                                    <span class="switch-text">Discord Rich Presence</span>
+                                                    <div class="switch">
+                                                        <input type="checkbox" id="discord-rpc-toggle">
+                                                        <span class="slider"></span>
+                                                    </div>
+                                                </label>
+                                            </div>
+                                            <div class="settings-option">
+                                                <button id="rpc-restart-btn" class="lib-btn" style="width:100%; justify-content:center; margin-top:4px;">
+                                                    <i class="fas fa-sync"></i> Restart RPC
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div class="settings-section">
+                                            <div class="settings-section-title">System</div>
+                                            <div class="settings-option" style="display:flex; justify-content:space-between; align-items:center;">
+                                                <span class="switch-text" style="font-weight:normal;">Operating System</span>
+                                                <span id="system-info" style="color: var(--text-secondary); font-size:0.9rem;">Unknown</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="settings-page" id="settings-page-visualizer">
+                                        <div class="settings-section">
+                                            <div class="settings-section-title">Visualizer</div>
+                                            <div class="settings-option">
+                                                <label class="switch-label">
+                                                    <span class="switch-text">Enable Visualizer</span>
+                                                    <div class="switch">
+                                                        <input type="checkbox" id="visualizer-toggle" checked>
+                                                        <span class="slider"></span>
+                                                    </div>
+                                                </label>
+                                                <div class="settings-note">Show audio visualizer next to current track</div>
+                                            </div>
+                                        </div>
+                                        <div class="settings-section">
+                                            <div class="settings-section-title">Appearance</div>
+                                            <div class="settings-option">
+                                                <label class="switch-label">
+                                                    <span class="switch-text">Light Theme</span>
+                                                    <div class="switch">
+                                                        <input type="checkbox" id="theme-toggle">
+                                                        <span class="slider"></span>
+                                                    </div>
+                                                </label>
+                                                <div class="settings-note">Switch between light and dark mode</div>
+                                            </div>
+                                            <div class="settings-option">
+                                                <label class="switch-label">
+                                                    <span class="switch-text">Matugen</span>
+                                                    <div class="switch">
+                                                        <input type="checkbox" id="matugen-toggle">
+                                                        <span class="slider"></span>
+                                                    </div>
+                                                </label>
+                                                <div class="settings-note">Theme colors from wallpaper</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -224,8 +231,7 @@
                         <button id="play-btn-small" class="ctrl-btn-small play-small" title="Play">
                             <i class="fas fa-play"></i>
                         </button>
-                        <button id="pause-btn-small" class="ctrl-btn-small pause-small" title="Pause"
-                            style="display: none;">
+                        <button id="pause-btn-small" class="ctrl-btn-small pause-small" title="Pause" style="display: none;">
                             <i class="fas fa-pause"></i>
                         </button>
                         <button id="next-btn-small" class="ctrl-btn-small" title="Next">
@@ -237,8 +243,7 @@
                     </div>
                     <div class="progress-container-small">
                         <span id="current-time-small" class="time-small">0:00</span>
-                        <input type="range" id="progress-small" class="progress-slider-small" min="0" max="100"
-                            value="0">
+                        <input type="range" id="progress-small" class="progress-slider-small" min="0" max="100" value="0">
                         <span id="duration-small" class="time-small">0:00</span>
                     </div>
                     <div class="volume-container-small">
@@ -247,6 +252,7 @@
                     </div>
                 </div>
             </div>
+
             <div class="library-grip" id="libraryGrip"></div>
             <div class="library-section">
                 <div class="library-header">
@@ -282,5 +288,4 @@
     </div>
     <script src="renderer.js"></script>
 </body>
-
 </html>

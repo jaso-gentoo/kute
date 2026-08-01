@@ -19,7 +19,8 @@ function loadSettings() {
                 repeatMode: 'none',
                 discordRpcEnabled: true,
                 theme: 'dark',
-                matugenEnabled: false
+                matugenEnabled: false,
+                visualizerEnabled: true
             };
         }
         const data = fs.readFileSync(CONFIG_FILE, 'utf8');
@@ -28,6 +29,7 @@ function loadSettings() {
         if (settings.discordRpcEnabled === undefined) settings.discordRpcEnabled = true;
         if (settings.theme === undefined) settings.theme = 'dark';
         if (settings.matugenEnabled === undefined) settings.matugenEnabled = false;
+        if (settings.visualizerEnabled === undefined) settings.visualizerEnabled = true;
         return settings;
     } catch (error) {
         return {
@@ -36,13 +38,14 @@ function loadSettings() {
             repeatMode: 'none',
             discordRpcEnabled: true,
             theme: 'dark',
-            matugenEnabled: false
+            matugenEnabled: false,
+            visualizerEnabled: true
         };
     }
 }
 
 let saveTimer = null;
-function saveSettings(volume, libraryPath, repeatMode, discordRpcEnabled, theme, matugenEnabled) {
+function saveSettings(volume, libraryPath, repeatMode, discordRpcEnabled, theme, matugenEnabled, visualizerEnabled) {
     if (saveTimer) clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
         try {
@@ -56,6 +59,7 @@ function saveSettings(volume, libraryPath, repeatMode, discordRpcEnabled, theme,
                 discordRpcEnabled: discordRpcEnabled,
                 theme: theme || 'dark',
                 matugenEnabled: matugenEnabled !== undefined ? matugenEnabled : false,
+                visualizerEnabled: visualizerEnabled !== undefined ? visualizerEnabled : true,
                 version: version
             };
             fs.writeFileSync(CONFIG_FILE, JSON.stringify(settings, null, 2));
