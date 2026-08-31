@@ -16,39 +16,23 @@
                 <span>kute :3</span>
             </div>
             <div class="header-right">
-                <button id="lyrics-btn-small" class="header-action-btn" title="Show lyrics">
-                    <i class="fas fa-file-alt"></i>
-                </button>
-                <button id="shortcuts-btn-small" class="header-action-btn" title="Keyboard shortcuts">
-                    <i class="fas fa-keyboard"></i>
-                </button>
-                <button id="edit-metadata-btn" class="header-action-btn" title="Edit track metadata">
-                    <i class="fas fa-edit"></i>
-                </button>
-                <button id="settings-btn-small" class="header-action-btn" title="Settings">
-                    <i class="fas fa-cog"></i>
-                </button>
+                <button id="lyrics-btn-small" class="header-action-btn" title="Show lyrics"><i class="fas fa-file-alt"></i></button>
+                <button id="shortcuts-btn-small" class="header-action-btn" title="Keyboard shortcuts"><i class="fas fa-keyboard"></i></button>
+                <button id="edit-metadata-btn" class="header-action-btn" title="Edit track metadata"><i class="fas fa-edit"></i></button>
+                <button id="settings-btn-small" class="header-action-btn" title="Settings"><i class="fas fa-cog"></i></button>
                 <div class="window-controls">
-                    <button class="win-btn maximize" id="maximize-btn" title="Maximize">
-                        <i class="fas fa-square"></i>
-                    </button>
-                    <button class="win-btn close" id="close-btn" title="Close">
-                        <i class="fas fa-times"></i>
-                    </button>
+                    <button class="win-btn maximize" id="maximize-btn"><i class="fas fa-square"></i></button>
+                    <button class="win-btn close" id="close-btn"><i class="fas fa-times"></i></button>
                 </div>
             </div>
         </div>
 
         <div class="app-content">
             <div class="player-section">
-                <div class="album-art-small" id="album-art-small">
-                    <i class="fas fa-music"></i>
-                </div>
+                <div class="album-art-small" id="album-art-small"><i class="fas fa-music"></i></div>
                 <div class="track-info-small">
                     <div id="track-title-small" class="track-title-small">No track</div>
-                    <div class="track-artist-small">
-                        <span id="track-artist-small">Select library</span>
-                    </div>
+                    <div class="track-artist-small"><span id="track-artist-small">Select library</span></div>
                 </div>
 
                 <div id="lyrics-modal" class="lyrics-modal">
@@ -58,36 +42,21 @@
                                 <h3 style="margin:0;">Lyrics</h3>
                                 <span id="lrc-offset-container" style="display:inline-flex; align-items:center; gap:4px; transition: opacity 0.3s ease, visibility 0.3s ease; visibility: hidden; opacity: 0;">
                                     <span style="font-size:12px; color:var(--text-muted);">LRC offset</span>
-                                    <input type="text" id="lrc-offset-input"
-                                        value="0.25"
-                                        style="width:60px; background:var(--bg-input); border:1px solid var(--border-color);
-                                                border-radius:4px; padding:2px 6px; color:var(--text-primary); font-size:12px;
-                                                text-align:center; outline:none; transition: opacity 0.3s ease;">
+                                    <input type="text" id="lrc-offset-input" value="0.25" style="width:60px; background:var(--bg-input); border:1px solid var(--border-color); border-radius:4px; padding:2px 6px; color:var(--text-primary); font-size:12px; text-align:center; outline:none; transition: opacity 0.3s ease;">
                                 </span>
                             </div>
                             <div class="modal-actions">
-                                <button id="lyrics-fetch-btn" class="modal-action-btn" title="Fetch synced lyrics from internet">
-                                    <i class="fas fa-cloud-download-alt"></i>
-                                </button>
-                                <button id="lyrics-load-btn" class="modal-action-btn" title="Load from file">
-                                    <i class="fas fa-folder-open"></i>
-                                </button>
-                                <button id="lyrics-save-btn" class="modal-action-btn" title="Edit / Save">
-                                    <i class="fas fa-edit"></i>
-                                </button>
-                                <button id="lyrics-close-btn" class="modal-close-btn" title="Close">
-                                    <i class="fas fa-times"></i>
-                                </button>
+                                <button id="lyrics-fetch-btn" class="modal-action-btn"><i class="fas fa-cloud-download-alt"></i></button>
+                                <button id="lyrics-load-btn" class="modal-action-btn"><i class="fas fa-folder-open"></i></button>
+                                <button id="lyrics-save-btn" class="modal-action-btn"><i class="fas fa-edit"></i></button>
+                                <button id="lyrics-close-btn" class="modal-close-btn"><i class="fas fa-times"></i></button>
                             </div>
                         </div>
                         <textarea id="lyrics-textarea" placeholder="Lyrics will appear here..."></textarea>
                         <div id="lyrics-display" class="lyrics-display" style="display: none;"></div>
-
                         <div class="lyrics-player-controls">
                             <div class="lpc-top">
-                                <button id="lpc-play-btn" class="lpc-btn" title="Play / Pause">
-                                    <i class="fas fa-play"></i>
-                                </button>
+                                <button id="lpc-play-btn" class="lpc-btn"><i class="fas fa-play"></i></button>
                                 <span id="lpc-current-time" class="lpc-time">0:00</span>
                                 <input type="range" id="lpc-progress" class="lpc-slider" min="0" max="100" value="0">
                                 <span id="lpc-duration" class="lpc-time">0:00</span>
@@ -105,37 +74,21 @@
                         <div class="metadata-modal-header">
                             <h3>Edit Track Metadata</h3>
                             <div class="modal-actions">
-                                <button id="metadata-save-btn" class="modal-action-btn" title="Save">
-                                    <i class="fas fa-save"></i>
-                                </button>
-                                <button id="metadata-cancel-btn" class="modal-close-btn" title="Cancel">
-                                    <i class="fas fa-times"></i>
-                                </button>
+                                <button id="metadata-fetch-btn" class="modal-action-btn"><i class="fas fa-cloud-download-alt"></i></button>
+                                <button id="metadata-save-btn" class="modal-action-btn"><i class="fas fa-save"></i></button>
+                                <button id="metadata-cancel-btn" class="modal-close-btn"><i class="fas fa-times"></i></button>
                             </div>
                         </div>
                         <div class="metadata-modal-body">
                             <div class="metadata-cover-section">
-                                <div id="metadata-cover-preview" class="metadata-cover-preview">
-                                    <i class="fas fa-music"></i>
-                                </div>
+                                <div id="metadata-cover-preview" class="metadata-cover-preview"><i class="fas fa-music"></i></div>
                                 <input type="file" id="metadata-cover-input" accept="image/*" style="display: none;">
-                                <button id="metadata-cover-btn" class="metadata-cover-btn">
-                                    <i class="fas fa-image"></i> Change Cover
-                                </button>
+                                <button id="metadata-cover-btn" class="metadata-cover-btn"><i class="fas fa-image"></i> Change Cover</button>
                             </div>
                             <div class="metadata-fields">
-                                <div class="metadata-field">
-                                    <label for="metadata-title"><i class="fas fa-heading"></i> Title</label>
-                                    <input type="text" id="metadata-title" class="metadata-input" placeholder="Track title">
-                                </div>
-                                <div class="metadata-field">
-                                    <label for="metadata-artist"><i class="fas fa-user"></i> Artist</label>
-                                    <input type="text" id="metadata-artist" class="metadata-input" placeholder="Artist name">
-                                </div>
-                                <div class="metadata-field">
-                                    <label for="metadata-album"><i class="fas fa-compact-disc"></i> Album</label>
-                                    <input type="text" id="metadata-album" class="metadata-input" placeholder="Album name">
-                                </div>
+                                <div class="metadata-field"><label for="metadata-title"><i class="fas fa-heading"></i> Title</label><input type="text" id="metadata-title" class="metadata-input" placeholder="Track title"></div>
+                                <div class="metadata-field"><label for="metadata-artist"><i class="fas fa-user"></i> Artist</label><input type="text" id="metadata-artist" class="metadata-input" placeholder="Artist name"></div>
+                                <div class="metadata-field"><label for="metadata-album"><i class="fas fa-compact-disc"></i> Album</label><input type="text" id="metadata-album" class="metadata-input" placeholder="Album name"></div>
                             </div>
                         </div>
                     </div>
@@ -145,24 +98,24 @@
                     <div class="modal-content">
                         <div class="modal-header">
                             <h3>Keyboard Shortcuts</h3>
-                            <button id="shortcuts-close-btn" class="modal-close-btn" title="Close">
-                                <i class="fas fa-times"></i>
-                            </button>
+                            <button id="shortcuts-close-btn" class="modal-close-btn"><i class="fas fa-times"></i></button>
                         </div>
                         <ul>
                             <li><kbd>Space</kbd> - Play / Pause</li>
-                            <li><kbd>↑</kbd> / <kbd>↓</kbd> - Previous / Next track</li>
-                            <li><kbd>←</kbd> / <kbd>→</kbd> - Volume -/+ 5%</li>
-                            <li><kbd>Ctrl+←</kbd> / <kbd>Ctrl+→</kbd> - Seek -/+ 5 sec</li>
-                            <li><kbd>Ctrl+X</kbd> - Edit metadata</li>
-                            <li><kbd>Ctrl+S</kbd> - Save lyrics / metadata</li>
-                            <li><kbd>Ctrl+D</kbd> - Show lyrics</li>
-                            <li><kbd>Ctrl+/</kbd> - Open shortcuts</li>
-                            <li><kbd>Ctrl+E</kbd> - Open settings</li>
-                            <li><kbd>Ctrl+O</kbd> - Select directory</li>
-                            <li><kbd>Ctrl+T</kbd> - Hide/show library panel</li>
-                            <li><kbd>Ctrl+Shift+E</kbd> - Edit playlist order</li>
-                            <li><kbd>Esc</kbd> - Close menu</li>
+                            <li><kbd>↑</kbd> / <kbd>↓</kbd> Previous / Next track</li>
+                            <li><kbd>←</kbd> / <kbd>→</kbd> Volume -/+ 5%</li>
+                            <li><kbd>Ctrl+←</kbd> / <kbd>Ctrl+→</kbd> Seek -/+ 5 sec</li>
+                            <li><kbd>Ctrl+X</kbd> Edit metadata</li>
+                            <li><kbd>Ctrl+S</kbd> Save lyrics / metadata</li>
+                            <li><kbd>Ctrl+D</kbd> Show lyrics</li>
+                            <li><kbd>Ctrl+/</kbd> Open shortcuts</li>
+                            <li><kbd>Ctrl+Y</kbd> Open stats</li>
+                            <li><kbd>Ctrl+E</kbd> Open settings</li>
+                            <li><kbd>Ctrl+O</kbd> Select directory</li>
+                            <li><kbd>Ctrl+T</kbd> Hide/show library panel</li>
+                            <li><kbd>Ctrl+Shift+E</kbd> Edit playlist order</li>
+                            <li><kbd>Ctrl+Y</kbd> Show statistics</li>
+                            <li><kbd>Esc</kbd> Close menu</li>
                         </ul>
                     </div>
                 </div>
@@ -171,9 +124,7 @@
                     <div class="modal-content">
                         <div class="settings-header">
                             <h3>Settings <span id="settings-version" class="settings-version-badge"></span></h3>
-                            <button id="settings-close-btn" class="modal-close-btn" title="Close">
-                                <i class="fas fa-times"></i>
-                            </button>
+                            <button id="settings-close-btn" class="modal-close-btn"><i class="fas fa-times"></i></button>
                         </div>
                         <div class="settings-tabs">
                             <button class="settings-tab active" data-tab="general">General</button>
@@ -188,27 +139,17 @@
                                             <div class="settings-option">
                                                 <label class="switch-label">
                                                     <span class="switch-text">Discord Rich Presence</span>
-                                                    <div class="switch">
-                                                        <input type="checkbox" id="discord-rpc-toggle">
-                                                        <span class="slider"></span>
-                                                    </div>
+                                                    <div class="switch"><input type="checkbox" id="discord-rpc-toggle"><span class="slider"></span></div>
                                                 </label>
                                             </div>
-                                            <div class="settings-option">
-                                                <button id="rpc-restart-btn" class="lib-btn" style="width:100%; justify-content:center; margin-top:4px;">
-                                                    <i class="fas fa-sync"></i> Restart RPC
-                                                </button>
-                                            </div>
+                                            <div class="settings-option"><button id="rpc-restart-btn" class="lib-btn" style="width:100%; justify-content:center; margin-top:4px;"><i class="fas fa-sync"></i> Restart RPC</button></div>
                                         </div>
                                         <div class="settings-section">
                                             <div class="settings-section-title">Lyrics</div>
                                             <div class="settings-option">
                                                 <label class="switch-label">
                                                     <span class="switch-text">LRC Support</span>
-                                                    <div class="switch">
-                                                        <input type="checkbox" id="lrc-toggle" checked>
-                                                        <span class="slider"></span>
-                                                    </div>
+                                                    <div class="switch"><input type="checkbox" id="lrc-toggle" checked><span class="slider"></span></div>
                                                 </label>
                                                 <div class="settings-note">Enable synced lyrics (LRC) support</div>
                                             </div>
@@ -227,10 +168,7 @@
                                             <div class="settings-option">
                                                 <label class="switch-label">
                                                     <span class="switch-text">Enable Visualizer</span>
-                                                    <div class="switch">
-                                                        <input type="checkbox" id="visualizer-toggle" checked>
-                                                        <span class="slider"></span>
-                                                    </div>
+                                                    <div class="switch"><input type="checkbox" id="visualizer-toggle" checked><span class="slider"></span></div>
                                                 </label>
                                                 <div class="settings-note">Show audio visualizer next to current track</div>
                                             </div>
@@ -240,20 +178,14 @@
                                             <div class="settings-option">
                                                 <label class="switch-label">
                                                     <span class="switch-text">Light Theme</span>
-                                                    <div class="switch">
-                                                        <input type="checkbox" id="theme-toggle">
-                                                        <span class="slider"></span>
-                                                    </div>
+                                                    <div class="switch"><input type="checkbox" id="theme-toggle"><span class="slider"></span></div>
                                                 </label>
                                                 <div class="settings-note">Switch between light and dark mode</div>
                                             </div>
                                             <div class="settings-option">
                                                 <label class="switch-label">
                                                     <span class="switch-text">Matugen</span>
-                                                    <div class="switch">
-                                                        <input type="checkbox" id="matugen-toggle">
-                                                        <span class="slider"></span>
-                                                    </div>
+                                                    <div class="switch"><input type="checkbox" id="matugen-toggle"><span class="slider"></span></div>
                                                 </label>
                                                 <div class="settings-note">Theme colors from wallpaper</div>
                                             </div>
@@ -265,23 +197,37 @@
                     </div>
                 </div>
 
+                <div id="stats-modal" class="stats-modal">
+                    <div class="stats-modal-content">
+                        <div class="stats-modal-header">
+                            <h3>Listening Statistics</h3>
+                            <button id="stats-close-btn" class="modal-close-btn"><i class="fas fa-times"></i></button>
+                        </div>
+                        <div class="stats-modal-body">
+                            <div class="stats-total">
+                                <span class="stats-total-label">Total listening time</span>
+                                <span class="stats-total-value" id="stats-total-time-modal">0h 0m</span>
+                            </div>
+                            <div class="stats-list-container">
+                                <div class="stats-list-header">
+                                    <span></span>
+                                    <span>Track</span>
+                                    <span>Plays</span>
+                                    <span>Time</span>
+                                </div>
+                                <div id="stats-list" class="stats-list"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="player-controls-container">
                     <div class="player-controls-small">
-                        <button id="prev-btn-small" class="ctrl-btn-small" title="Previous">
-                            <i class="fas fa-step-backward"></i>
-                        </button>
-                        <button id="play-btn-small" class="ctrl-btn-small play-small" title="Play">
-                            <i class="fas fa-play"></i>
-                        </button>
-                        <button id="pause-btn-small" class="ctrl-btn-small pause-small" title="Pause" style="display: none;">
-                            <i class="fas fa-pause"></i>
-                        </button>
-                        <button id="next-btn-small" class="ctrl-btn-small" title="Next">
-                            <i class="fas fa-step-forward"></i>
-                        </button>
-                        <button id="repeat-btn-small" class="ctrl-btn-small" title="Repeat">
-                            <i class="fa-solid fa-repeat"></i>
-                        </button>
+                        <button id="prev-btn-small" class="ctrl-btn-small"><i class="fas fa-step-backward"></i></button>
+                        <button id="play-btn-small" class="ctrl-btn-small play-small"><i class="fas fa-play"></i></button>
+                        <button id="pause-btn-small" class="ctrl-btn-small pause-small" style="display: none;"><i class="fas fa-pause"></i></button>
+                        <button id="next-btn-small" class="ctrl-btn-small"><i class="fas fa-step-forward"></i></button>
+                        <button id="repeat-btn-small" class="ctrl-btn-small"><i class="fa-solid fa-repeat"></i></button>
                     </div>
                     <div class="progress-container-small">
                         <span id="current-time-small" class="time-small">0:00</span>
@@ -305,20 +251,12 @@
                         </div>
                     </div>
                     <div class="button-group">
-                        <button id="select-library-small" class="lib-btn" title="Select Music Folder">
-                            <i class="fas fa-folder-plus"></i> <span class="btn-text">Select</span>
-                        </button>
-                        <button id="edit-playlist-btn" class="lib-btn edit-playlist-btn" title="Edit playlist order">
-                            <i class="fas fa-edit"></i> <span class="btn-text">Edit</span>
-                        </button>
+                        <button id="select-library-small" class="lib-btn"><i class="fas fa-folder-plus"></i> <span class="btn-text">Select</span></button>
+                        <button id="edit-playlist-btn" class="lib-btn edit-playlist-btn"><i class="fas fa-edit"></i> <span class="btn-text">Edit</span></button>
                     </div>
                 </div>
                 <div class="playlist-container-small" id="track-list-small">
-                    <div class="empty-state-small">
-                        <i class="fas fa-folder-open"></i>
-                        <p>No music folder selected</p>
-                        <small>Click "Select" to choose your music library</small>
-                    </div>
+                    <div class="empty-state-small"><i class="fas fa-folder-open"></i><p>No music folder selected</p><small>Click "Select" to choose your music library</small></div>
                 </div>
                 <div class="status-bar">
                     <span id="track-count">0 tracks</span>

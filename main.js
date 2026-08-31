@@ -34,26 +34,39 @@ async function initDiscordRPC() {
         rpc = null;
     }
     rpcReady = false;
-    try {
-        rpc = new Client({ clientId });
-        rpc.on('ready', () => {
-            console.log('[RPC] ready event fired');
-            rpcReady = true;
-        });
-        await rpc.connect();
-        console.log('[RPC] Login successful');
-        setTimeout(() => {
-            if (rpc && rpc.user) {
+    return new Promise((resolve, reject) => {
+        try {
+            rpc = new Client({ clientId });
+            rpc.on('ready', () => {
+                console.log('[RPC] ready event fired');
                 rpcReady = true;
-                console.log('[RPC] Client is ready');
-            } else {
-                console.warn('[RPC] Client connected but user object not available');
-            }
-        }, 500);
-    } catch (err) {
-        console.error('[RPC] Failed:', err);
-        setTimeout(initDiscordRPC, 5000);
-    }
+                resolve();
+            });
+            rpc.on('error', (err) => {
+                console.error('[RPC] error:', err);
+                reject(err);
+            });
+            rpc.connect().then(() => {
+                console.log('[RPC] Login successful');
+                setTimeout(() => {
+                    if (rpc && rpc.user) {
+                        rpcReady = true;
+                        console.log('[RPC] Client is ready (timeout)');
+                        resolve();
+                    } else {
+                        console.warn('[RPC] Client connected but user object not available');
+                        resolve();
+                    }
+                }, 500);
+            }).catch(err => {
+                console.error('[RPC] connect error:', err);
+                reject(err);
+            });
+        } catch (err) {
+            console.error('[RPC] init error:', err);
+            reject(err);
+        }
+    });
 }
 
 function createWindow() {
@@ -123,14 +136,20 @@ ipcMain.on('update-presence', (event, data) => {
     }
 });
 
-ipcMain.on('rpc-reconnect', () => {
+ipcMain.on('rpc-reconnect', async () => {
     if (reconnectTimer) clearTimeout(reconnectTimer);
-    initDiscordRPC();
+    try {
+        await initDiscordRPC();
+        if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('rpc-reconnected');
+        }
+    } catch (err) {
+        console.error('[RPC] reconnect failed:', err);
+    }
 });
 
 app.whenReady().then(() => {
     const home = app.getPath('home');
-    const configDir = path.join(home, '.config', 'kute-player');
     const electronDataDir = path.join(home, '.cache', 'kute-player', 'electron');
 
     if (!fs.existsSync(electronDataDir)) {
@@ -142,7 +161,9 @@ app.whenReady().then(() => {
     app.setPath('logs', path.join(electronDataDir, 'logs'));
 
     createWindow();
-    initDiscordRPC();
+    initDiscordRPC().catch(err => {
+        console.warn('[RPC] Initial connection failed (Discord not running?)', err.message);
+    });
 });
 
 app.on('window-all-closed', () => {
