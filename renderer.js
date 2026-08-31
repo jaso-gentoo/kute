@@ -127,7 +127,6 @@ let lrcOffsets = {};
 let currentLrcOffset = 0.25;
 let offsetSaveTimeout = null;
 
-
 function getSystemKey() {
     try {
         let machineId = '';
@@ -205,6 +204,8 @@ let currentTrackPath = null;
 let currentTrackStartTime = 0;
 let currentTrackAccumulated = 0;
 let statsSaveTimer = null;
+
+document.getElementById('stats-btn-small')?.addEventListener('click', openStatsModal);
 
 function flushTrackStats(force = false) {
     if (!currentTrackPath || !isPlaying) return;
