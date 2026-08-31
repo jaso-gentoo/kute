@@ -765,7 +765,7 @@ function refreshTrackList() {
         nameDiv.textContent = track.name.length > 25 ? track.name.substring(0, 22) + '...' : track.name;
         const infoDiv = document.createElement('div');
         infoDiv.className = 'track-info-small-text';
-        infoDiv.textContent = `${track.artist} • ${track.album || 'No Album'}`;
+        infoDiv.textContent = `${track.artist} • ${track.album || 'Unknown Album'}`;
         detailsDiv.appendChild(nameDiv);
         detailsDiv.appendChild(infoDiv);
 
@@ -963,10 +963,9 @@ function updateTrackInfo(index) {
     const track = tracks[index];
     const truncate = (text, max) => text.length > max ? text.substring(0, max - 1) + '…' : text;
     trackTitle.textContent = truncate(track.name, 35);
-    let info = '';
-    if (track.artist && track.album) info = `${track.artist} • ${track.album}`;
-    else if (track.artist) info = track.artist;
-    else info = `Track ${index + 1} of ${tracks.length}`;
+    const artistDisplay = track.artist || 'Unknown Artist';
+    const albumDisplay = track.album || 'Unknown Album';
+    let info = artistDisplay + (albumDisplay ? ' • ' + albumDisplay : '');
     trackArtist.textContent = truncate(info, 45);
 }
 
@@ -2006,7 +2005,7 @@ async function saveMetadata() {
         const tags = {
             title: newTitle,
             artist: newArtist,
-            album: newAlbum
+            album: newAlbum || null
         };
         if (currentCoverFile) {
             const reader = new FileReader();
@@ -2028,7 +2027,7 @@ async function saveMetadata() {
         if (success) {
             track.name = newTitle;
             track.artist = newArtist;
-            track.album = newAlbum;
+            track.album = newAlbum || null;
             if (currentCoverFile) {
                 if (track.cover?.startsWith('blob:')) URL.revokeObjectURL(track.cover);
                 track.cover = URL.createObjectURL(currentCoverFile);
